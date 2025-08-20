@@ -1,0 +1,44 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Kraken GIF Slideshow</title>
+  <style>
+    html, body { height: 100%; margin: 0; background: #000; }
+    body { display: flex; align-items: center; justify-content: center; }
+    img { max-width: 100%; max-height: 100%; object-fit: contain; }
+  </style>
+</head>
+<body>
+  <img id="slide" alt="gif" />
+  <script>
+    // --- CONFIG ---
+    // Replace these with your own GIF URLs (absolute HTTPS recommended)
+    const gifs = [
+      "https://media.giphy.com/media/l0HlQ7LRal8X9sWzO/giphy.gif",
+      "https://media.giphy.com/media/3o6ZsYm5P38d6jdf6g/giphy.gif",
+      "https://media.giphy.com/media/26Fxy3Iz1ari8oytO/giphy.gif"
+    ];
+
+    // Default interval in seconds. Can be overridden via ?interval=NN (seconds)
+    const defaultIntervalSeconds = 30;
+
+    // --- RUNTIME ---
+    const params = new URLSearchParams(location.search);
+    const intervalSec = Math.max(1, parseInt(params.get("interval") || defaultIntervalSeconds, 10));
+    const intervalMs = intervalSec * 1000;
+
+    let i = 0;
+    const img = document.getElementById("slide");
+
+    function show() {
+      img.src = gifs[i];
+      i = (i + 1) % gifs.length;
+    }
+
+    show();
+    setInterval(show, intervalMs);
+  </script>
+</body>
+</html>
