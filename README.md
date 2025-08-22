@@ -79,4 +79,4 @@ It supports images (`png`, `jpg`, `gif`, `webp`) and video (`mp4`, `webm`) with 
 ---
 
 Enjoy your fully custom Kraken slideshow!
-```
+
