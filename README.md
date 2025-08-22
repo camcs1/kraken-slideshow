@@ -1,6 +1,6 @@
 # Kraken Media Slideshow (with Configure UI, Drag-Drop, and Preview)
 
-This project lets you run a fully custom media slideshow on an **NZXT Kraken Z-series LCD** using the CAM **Web Integration** feature.  
+This project lets you run a fully custom media slideshow on an **NZXT Kraken LCD** using the CAM **Web Integration** feature.  
 It supports images (`png`, `jpg`, `gif`, `webp`) and video (`mp4`, `webm`) with flexible intervals and cropping options designed for the Kraken’s circular screen.
 
 ---
