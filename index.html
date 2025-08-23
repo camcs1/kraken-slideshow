@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Kraken Media Slideshow (edit mode live preview)</title>
+<title>Kraken Media Slideshow (edit mode + play-once + better object-fit)</title>
 <style>
   html,body{height:100%;margin:0}
   body{background:#000;color:#eaeaea;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
@@ -14,19 +14,24 @@
     display:flex;align-items:center;justify-content:center;
     background:var(--bg,#000);
   }
-  .media{position:absolute;inset:0;margin:auto;max-width:100%;max-height:100%;display:none}
-  .show{display:block}
-  .fade{transition:opacity 250ms ease;opacity:0}
-  .fade.show{opacity:1}
-  .contain{object-fit:contain}
-  .cover{object-fit:cover}
+
+  /* IMPORTANT: give <img>/<video> a real box so object-fit works */
   .media{
+    position:absolute; inset:0; margin:auto;
+    width:100%; height:100%;
+    display:none;
+    transition:opacity 250ms ease;
+    opacity:0;
+
     transform-origin:50% 50%;
     transform:
       translate(var(--tx,0%), var(--ty,0%))
       scale(var(--scale,1))
       rotate(var(--rot,0deg));
   }
+  .show{display:block; opacity:1}
+  .contain{object-fit:contain}
+  .cover{object-fit:cover}
 
   /* ===== Configure UI ===== */
   .wrap{max-width:1200px;margin:24px auto;padding:0 16px}
@@ -36,6 +41,7 @@
   .card{background:#121212;border-radius:12px;padding:16px;box-shadow:0 6px 20px rgba(0,0,0,.25);margin-bottom:14px}
   label{display:block;margin:8px 0 6px;font-weight:600}
   input[type="text"],input[type="number"],textarea,select{width:100%;padding:10px;border-radius:8px;border:1px solid #333;background:#0e0e0e;color:#eaeaea}
+  input[type="checkbox"]{transform:scale(1.2);margin-right:8px}
   textarea{min-height:120px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
   .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
   .actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
@@ -54,7 +60,7 @@
   .grab{cursor:grab;user-select:none;font-weight:700;padding:6px 8px;background:#1b1b1b;border-radius:8px}
   .dragging{opacity:.6}
   .u{width:100%}
-  .opt{width:260px}
+  .opt{width:280px}
   .rm{background:#ef4444}
   .edit{background:#334155}
   .selected{outline:2px solid #6d5ef9}
@@ -89,8 +95,8 @@
 
 <!-- Player (device renderer) -->
 <div id="player" class="stage" style="display:none">
-  <img id="imgEl" class="media fade contain" alt="media">
-  <video id="vidEl" class="media fade contain" muted playsinline preload="auto"></video>
+  <img id="imgEl" class="media contain" alt="media">
+  <video id="vidEl" class="media contain" muted playsinline preload="auto"></video>
 </div>
 
 <!-- Configure -->
@@ -108,7 +114,7 @@
       <button id="load" class="secondary">Load</button>
       <button id="clear" class="secondary">Clear</button>
     </div>
-    <div class="muted">Drag the ☰ handle to reorder. Select a row and tweak settings in the inspector. In <b>Edit Mode</b>, the Kraken shows the selected item live. Any change updates the preview immediately. Press <b>Save</b> to exit Edit Mode and resume the slideshow.</div>
+    <div class="muted">Drag the ☰ handle to reorder. Select a row and tweak settings in the inspector. In <b>Edit Mode</b>, the Kraken shows the selected item live and updates on every change. Press <b>Save</b> to exit Edit Mode and resume the slideshow.</div>
     <ul id="list" class="list"></ul>
   </div>
 
@@ -129,7 +135,7 @@
       <div>
         <label>Per-image duration (seconds)</label>
         <input id="i_seconds" type="number" min="0" value="0">
-        <div class="muted">Only for images; 0 = use global interval.</div>
+        <div class="muted">For images/GIFs; 0 = use global interval.</div>
       </div>
       <div>
         <label>Video: loop</label>
@@ -150,6 +156,10 @@
           <option value="contain">contain</option>
           <option value="cover">cover</option>
         </select>
+      </div>
+      <div style="grid-column:1/-1;display:flex;align-items:center;margin-top:4px">
+        <input id="i_playOnce" type="checkbox">
+        <label for="i_playOnce" style="margin:0; font-weight:600">Play once</label>
       </div>
     </div>
 
@@ -173,7 +183,9 @@
       </div>
     </div>
 
-    <div class="muted" style="margin-top:10px">Overrides are saved in the item JSON. Blank/“inherit” falls back to global settings.</div>
+    <div class="muted" style="margin-top:10px">
+      <b>Play once:</b> Videos advance on <code>ended</code> (loop disabled). GIFs/images show for this item's <b>seconds</b> (or global interval if not set), then advance. Browsers don’t expose a GIF’s intrinsic duration.
+    </div>
   </div>
 
   <!-- Global Options -->
@@ -252,6 +264,16 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
   const isKraken = new URLSearchParams(location.search).get("kraken") === "1";
   document.getElementById(isKraken ? "player" : "config").style.display = isKraken ? "flex" : "block";
 
+  /* CAM viewport: lock stage size to device pixels if provided */
+  (function lockToDeviceViewport(){
+    const nzxt = window.nzxt && window.nzxt.v1;
+    if (!nzxt) return; // desktop browser: keep responsive
+    const stage = document.getElementById('player');
+    if (!stage) return;
+    stage.style.width  = nzxt.width  ? nzxt.width + 'px'  : '';
+    stage.style.height = nzxt.height ? nzxt.height + 'px' : '';
+  })();
+
   /* ---------- Helper utils ---------- */
   const clamp = (v,min,max)=>Math.max(min,Math.min(max,v));
   function inferType(url){ return /\.(mp4|webm)(\?.*)?$/i.test(url) ? "video" : "image"; }
@@ -262,6 +284,7 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
   }
   function itemToOptString(it){
     const o = {};
+    if (it.playOnce === true) o.playOnce = true;
     if (it.type === "image" && it.seconds) o.seconds = it.seconds;
     if (it.type === "video"){
       if (typeof it.loop === "boolean") o.loop = it.loop;
@@ -293,9 +316,7 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
     });
   }
   function postEditMessage(msg){
-    // Persist for storage event fallback
     try { localStorage.setItem(K_EDIT, JSON.stringify({ts:Date.now(), ...msg})); } catch {}
-    // BroadcastChannel if available
     try { const bc = new BroadcastChannel("krakenChannel"); bc.postMessage({type:"edit", ...msg}); setTimeout(()=>bc.close(),200); } catch {}
   }
 
@@ -307,7 +328,7 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
     let selectedLi = null;
     let editMode = false;
 
-    /* ---- Playlist rows (drag, edit, remove) ---- */
+    /* ---- Playlist rows ---- */
     function createItem(url="", opt=""){
       const li = document.createElement("li");
       li.className = "item";
@@ -316,24 +337,21 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
         <div class="grab" title="Drag to reorder">☰</div>
         <input class="u" type="text" placeholder="https://example.com/image.webp or video.mp4" value="${url.replace(/"/g,'&quot;')}">
         <div style="display:flex;gap:10px;align-items:center">
-          <input class="opt" type="text" placeholder='Optional JSON (e.g. {"seconds":45} or {"loop":true,"maxSeconds":8})' value="${opt.replace(/"/g,'&quot;')}">
+          <input class="opt" type="text" placeholder='Optional JSON (e.g. {"seconds":45,"playOnce":true})' value="${opt.replace(/"/g,'&quot;')}">
           <button class="edit">Edit</button>
           <button class="rm">Remove</button>
         </div>
       `;
 
-      /* Remove */
       li.querySelector(".rm").addEventListener("click", ()=>{
         const wasSelected = (selectedLi === li);
         li.remove();
         if (wasSelected) clearInspector();
-        if (editMode && wasSelected) maybePreviewSelected(); // no selection -> no preview
+        if (editMode && wasSelected) maybePreviewSelected();
       });
 
-      /* Edit (select) */
       li.querySelector(".edit").addEventListener("click", ()=> selectLi(li));
 
-      /* Drag and drop */
       li.addEventListener("dragstart", e=>{ li.classList.add("dragging"); e.dataTransfer.effectAllowed="move"; });
       li.addEventListener("dragend",   ()=> li.classList.remove("dragging"));
       li.addEventListener("dragover", e=>{
@@ -345,13 +363,11 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
         listEl.insertBefore(dragging, before ? li : li.nextSibling);
       });
 
-      /* Click background selects */
       li.addEventListener("click", (e)=>{
         if (e.target.tagName === "INPUT" || e.target.tagName === "BUTTON") return;
         selectLi(li);
       });
 
-      /* URL/options change should reflect inspector and preview (if selected) */
       li.querySelector(".u").addEventListener("change", ()=>{
         if (li === selectedLi){ loadInspectorFromLi(li); if(editMode) maybePreviewSelected(); }
       });
@@ -379,7 +395,7 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
       });
     }
 
-    /* ---- Import / Export helpers ---- */
+    /* ---- Import / Export ---- */
     function importText(text){
       const lines=(text||"").split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
       const items=[];
@@ -389,7 +405,6 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
         items.push(parseItem(m[1], m[2]||""));
       }
       fromModel(items);
-      // If in edit mode and something is selected, refresh preview
       if (editMode && selectedLi) maybePreviewSelected();
     }
     function exportText(){
@@ -420,7 +435,7 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
         if(id==="rot") els.rotVal.textContent = els.rot.value;
         if(id==="tx") els.txVal.textContent = els.tx.value;
         if(id==="ty") els.tyVal.textContent = els.ty.value;
-        if (editMode) maybePreviewSelected(); // live update during edit mode
+        if (editMode) maybePreviewSelected();
       });
     });
     ["interval","videoMax","fit","bg"].forEach(id=>{
@@ -466,9 +481,11 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
       fromModel(items);
       writeGlobals(opts);
       if(!items.length){
-        importText(`https://www.gstatic.com/webp/gallery/1.webp
-https://media.giphy.com/media/l0HlQ7LRal8X9sWzO/giphy.gif
-https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4 {"loop":false,"maxSeconds":6}`);
+        fromModel([
+          { src:"https://www.gstatic.com/webp/gallery/1.webp", type:"image" },
+          { src:"https://media.giphy.com/media/l0HlQ7LRal8X9sWzO/giphy.gif", type:"image", seconds:8, playOnce:true },
+          { src:"https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4", type:"video", loop:false, playOnce:true }
+        ]);
       }
     }
     function clearAll(){
@@ -479,7 +496,13 @@ https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4 {"loop"
     }
 
     /* ---- Buttons ---- */
-    document.getElementById("add").addEventListener("click", ()=> listEl.appendChild(createItem()));
+    document.getElementById("add").addEventListener("click", ()=>{
+      const li = createItem();
+      listEl.appendChild(li);
+      // Auto-select the new row
+      selectLi(li);
+      if (editMode) maybePreviewSelected();
+    });
     document.getElementById("exportTxt").addEventListener("click", ()=>{
       const t = exportText();
       navigator.clipboard.writeText(t).catch(()=>{});
@@ -518,6 +541,7 @@ https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4 {"loop"
       loop:    document.getElementById("i_loop"),
       maxSeconds: document.getElementById("i_maxSeconds"),
       fit:     document.getElementById("i_fit"),
+      playOnce:document.getElementById("i_playOnce"),
       scale:   document.getElementById("i_scale"),
       rotDeg:  document.getElementById("i_rotDeg"),
       txPct:   document.getElementById("i_txPct"),
@@ -528,6 +552,7 @@ https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4 {"loop"
       if (selectedLi) selectedLi.classList.remove("selected");
       selectedLi = null;
       ins.root.style.display = "none";
+      if (editMode) maybePreviewSelected(); // clears preview
     }
     function loadInspectorFromLi(li){
       const url = li.querySelector(".u").value.trim();
@@ -539,6 +564,7 @@ https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4 {"loop"
       ins.loop.value      = (typeof it.loop === "boolean") ? String(it.loop) : "inherit";
       ins.maxSeconds.value= it.maxSeconds || 0;
       ins.fit.value       = it.fit ? it.fit : "inherit";
+      ins.playOnce.checked= !!it.playOnce;
       ins.scale.value     = (it.scale!=null) ? Math.round(it.scale*100) : "";
       ins.rotDeg.value    = (it.rotDeg!=null) ? it.rotDeg : "";
       ins.txPct.value     = (it.txPct!=null) ? it.txPct : "";
@@ -550,10 +576,15 @@ https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4 {"loop"
       const type = inferType(url);
       const it = parseItem(url, li.querySelector(".opt").value.trim());
       it.type = type;
+
+      // playOnce for both images and videos
+      if (ins.playOnce.checked) it.playOnce = true; else delete it.playOnce;
+
       const seconds = parseInt(ins.seconds.value||"0",10);
       if (type==="image"){
         if (seconds>0) it.seconds = seconds; else delete it.seconds;
       } else { delete it.seconds; }
+
       if (type==="video"){
         const ms = parseInt(ins.maxSeconds.value||"0",10);
         if (ms>0) it.maxSeconds = ms; else delete it.maxSeconds;
@@ -561,14 +592,17 @@ https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4 {"loop"
         else if (ins.loop.value==="false") it.loop = false;
         else delete it.loop;
       } else { delete it.loop; delete it.maxSeconds; }
+
       const fit = ins.fit.value;
       if (fit==="contain" || fit==="cover") it.fit = fit; else delete it.fit;
+
       const s = ins.scale.value.trim();
       if (s!==""){ it.scale = clamp(parseInt(s,10)/100, 0.01, 5); } else delete it.scale;
       ["rotDeg","txPct","tyPct"].forEach(k=>{
         const v = ins[k].value.trim();
         if (v!=="") it[k] = parseInt(v,10); else delete it[k];
       });
+
       li.querySelector(".opt").value = itemToOptString(it);
     }
     function selectLi(li){
@@ -591,10 +625,11 @@ https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4 {"loop"
 
     function maybePreviewSelected(){
       const data = getSelectedItemAndOptions();
-      if (!editMode || !data) return;
+      if (!editMode || !data) { postEditMessage({ action:"update", item:null }); return; }
       postEditMessage({ action:"update", item:data.it, options:data.opts });
     }
 
+    // apply/clear buttons
     ins.apply.addEventListener("click", ()=>{
       if (!selectedLi) return;
       writeLiFromInspector(selectedLi);
@@ -614,12 +649,10 @@ https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4 {"loop"
       editMode = on;
       editBtn.textContent = on ? "Exit Edit Mode" : "Enter Edit Mode";
       if (on){
-        // start edit session and show current selection (or none)
         const data = getSelectedItemAndOptions();
         postEditMessage({ action:"start", item: data?.it || null, options: data?.opts || readGlobals() });
         if (data) postEditMessage({ action:"update", item:data.it, options:data.opts });
       } else {
-        // tell device to resume slideshow; if from Save, also say "Saved" after resume ping
         postEditMessage({ action:"end" });
         if (fromSave) alert("Saved and exited Edit Mode.");
       }
@@ -650,34 +683,40 @@ https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4 {"loop"
     if(!items.length){
       localStorage.setItem(K_PLAYLIST, JSON.stringify([
         { src:"https://www.gstatic.com/webp/gallery/1.webp", type:"image" },
-        { src:"https://media.giphy.com/media/l0HlQ7LRal8X9sWzO/giphy.gif", type:"image" },
-        { src:"https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4", type:"video", loop:false }
+        { src:"https://media.giphy.com/media/l0HlQ7LRal8X9sWzO/giphy.gif", type:"image", seconds:8, playOnce:true },
+        { src:"https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4", type:"video", loop:false, playOnce:true }
       ]));
       location.reload();
     }
 
     let idx=0, timer=null;
-    let editMode=false;        // if true, we freeze slideshow timers
+    let editMode=false;        // if true, freeze slideshow timers
     let lastMsgTs=0;
 
     const clearTimer=()=>{ if(timer){ clearTimeout(timer); timer=null; } };
 
-    function showImage(src, seconds, opts, advance=true){
+    function showImage(src, seconds, entry, opts, advance=true){
       clearTimer();
       applyVisual(stage, imgEl, vidEl, opts || o);
       vidEl.pause(); vidEl.removeAttribute('src'); vidEl.load(); vidEl.classList.remove('show');
       imgEl.src = src; imgEl.classList.add('show');
+
       if (!editMode && advance){
-        const s = Math.max(1, seconds || (opts?.interval ?? o.interval) || 30);
+        // If playOnce is requested for images/GIFs, we rely on per-item seconds or global interval
+        const base = Math.max(1, seconds || (opts?.interval ?? o.interval) || 30);
+        const s = entry?.playOnce ? base : base; // same timing, semantics differ
         timer = setTimeout(next, s*1000);
       }
     }
+
     function showVideo(src, entry, opts, advance=true){
       clearTimer();
       applyVisual(stage, imgEl, vidEl, opts || o);
       imgEl.classList.remove('show');
+
+      const playOnce = !!entry.playOnce;
       const maxSeconds = (opts?.videoMax || 0) || entry.maxSeconds || 0;
-      const loop = (entry.loop===true) && !maxSeconds;
+      const loop = playOnce ? false : (entry.loop===true) && !maxSeconds;
 
       vidEl.loop = loop;
       vidEl.muted = true;
@@ -685,13 +724,23 @@ https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4 {"loop"
       vidEl.autoplay = true;
       vidEl.src = src;
       vidEl.classList.add('show');
+
       const p = vidEl.play(); if(p && p.catch) p.catch(()=>setTimeout(()=>vidEl.play().catch(()=>{}),250));
 
       function advanceNow(){ vidEl.removeEventListener('ended', advanceNow); next(); }
+
       if (!editMode && advance){
-        if(maxSeconds) timer = setTimeout(advanceNow, Math.max(1,maxSeconds)*1000);
-        else if(!vidEl.loop) vidEl.addEventListener('ended', advanceNow, { once:true });
-        else if(opts?.interval || o.interval) timer = setTimeout(advanceNow, Math.max(1,(opts?.interval||o.interval))*1000);
+        if (playOnce){
+          // advance exactly when the video ends
+          vidEl.addEventListener('ended', advanceNow, { once:true });
+          if (maxSeconds) timer = setTimeout(advanceNow, Math.max(1,maxSeconds)*1000);
+        } else if (maxSeconds){
+          timer = setTimeout(advanceNow, Math.max(1,maxSeconds)*1000);
+        } else if (!vidEl.loop){
+          vidEl.addEventListener('ended', advanceNow, { once:true });
+        } else if (opts?.interval || o.interval){
+          timer = setTimeout(advanceNow, Math.max(1,(opts?.interval||o.interval))*1000);
+        }
       }
     }
 
@@ -702,7 +751,7 @@ https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4 {"loop"
       void imgEl.offsetWidth; void vidEl.offsetWidth;
       imgEl.classList.add('fade'); vidEl.classList.add('fade');
       if(it.type === 'video') showVideo(it.src, it, eff);
-      else showImage(it.src, it.seconds, eff);
+      else showImage(it.src, it.seconds, it, eff);
     }
     function next(){
       idx = (idx + 1) % items.length;
@@ -720,24 +769,25 @@ https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4 {"loop"
       if (msg.action === "start"){
         editMode = true;
         clearTimer();
-        // If a starting item is provided, show it, else keep current frame frozen
+        if (msg.options) o = Object.assign({}, o, msg.options);
         if (msg.item){
           const it = msg.item;
           const opts = msg.options || o;
           if (inferType(it.src) === "video") showVideo(it.src, it, opts, false);
-          else showImage(it.src, it.seconds, opts, false);
+          else showImage(it.src, it.seconds, it, opts, false);
         }
       }
       else if (msg.action === "update"){
-        editMode = true; // ensure
+        editMode = true;
         clearTimer();
+        if (!msg.item) return; // no selection
         const it = msg.item;
         const opts = msg.options || o;
         imgEl.classList.remove('fade'); vidEl.classList.remove('fade');
         void imgEl.offsetWidth; void vidEl.offsetWidth;
         imgEl.classList.add('fade'); vidEl.classList.add('fade');
         if (inferType(it.src) === "video") showVideo(it.src, it, opts, false);
-        else showImage(it.src, it.seconds, opts, false);
+        else showImage(it.src, it.seconds, it, opts, false);
       }
       else if (msg.action === "end"){
         // Exit edit mode and resume slideshow using latest saved playlist/options
