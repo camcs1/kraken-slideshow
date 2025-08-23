@@ -3,83 +3,163 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Kraken Media Slideshow (Edit mode, no fit option)</title>
+<title>Kraken Media Slideshow (per-item editor + preview, edit-mode)</title>
 <style>
   html,body{height:100%;margin:0}
   body{background:#000;color:#eaeaea;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
 
-  .stage{position:relative;width:100vw;height:100vh;overflow:hidden;display:flex;align-items:center;justify-content:center;background:var(--bg,#000)}
-  .deviceBox{width:100%;height:100%;position:relative}
-  .deviceBox.circle{
-    -webkit-mask-image:radial-gradient(circle at 50% 50%,#fff 0 calc(50% - var(--pad,0%)),transparent calc(50% - var(--pad,0%)));
-            mask-image:radial-gradient(circle at 50% 50%,#fff 0 calc(50% - var(--pad,0%)),transparent calc(50% - var(--pad,0%)));
+  /* ===== Player stage ===== */
+  .stage{
+    position:relative;width:100vw;height:100vh;overflow:hidden;
+    display:flex;align-items:center;justify-content:center;
+    background:var(--bg,#000);
   }
-  .deviceBox.circle::after{content:"";position:absolute;inset:calc(50% - (50% - var(--pad,0%)));border-radius:50%;border:var(--ringW,0px) solid var(--ringC,#222);pointer-events:none}
+  .stage.circle{
+    -webkit-mask-image: radial-gradient(circle at 50% 50%, #fff 0 calc(50% - var(--pad,0%)), transparent calc(50% - var(--pad,0%)));
+            mask-image: radial-gradient(circle at 50% 50%, #fff 0 calc(50% - var(--pad,0%)), transparent calc(50% - var(--pad,0%)));
+  }
+  .stage.circle::after{
+    content:""; position:absolute; inset:calc(50% - (50% - var(--pad,0%)));
+    border-radius:50%;
+    border: var(--ringW,0px) solid var(--ringC,#222);
+    pointer-events:none;
+  }
 
-  .media{position:absolute;inset:0;margin:auto;max-width:100%;max-height:100%;display:none;transform-origin:50% 50%}
+  .media{position:absolute;inset:0;margin:auto;max-width:100%;max-height:100%;display:none}
   .show{display:block}
   .fade{transition:opacity 300ms ease;opacity:0}
   .fade.show{opacity:1}
-  .media{transform:translate(var(--tx,0%),var(--ty,0%)) scale(var(--scale,1)) rotate(var(--rot,0deg))}
+
+  /* Keep default to contain. Object-fit control removed by request */
+  .media{object-fit:contain}
+
+  .media{
+    transform-origin:50% 50%;
+    transform:
+      translate(var(--tx,0%), var(--ty,0%))
+      scale(var(--scale,1))
+      rotate(var(--rot,0deg));
+  }
+
+  /* ===== Configure UI ===== */
+  .wrap{max-width:1200px;margin:24px auto;padding:0 16px}
+  h1{font-size:1.25rem;margin:0 0 14px}
+  .grid{display:grid;gap:12px}
+  .cols-2{grid-template-columns:1fr 1fr}
+  .cols-3{grid-template-columns:2fr 1fr 1fr}
+  .card{background:#121212;border-radius:12px;padding:16px;box-shadow:0 6px 20px rgba(0,0,0,.25);margin-bottom:14px}
+  label{display:block;margin:8px 0 6px;font-weight:600}
+  input[type="text"],input[type="number"],textarea,select{width:100%;padding:10px;border-radius:8px;border:1px solid #333;background:#0e0e0e;color:#eaeaea}
+  textarea{min-height:120px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .actions{display:flex;gap:10px;flex-wrap:wrap}
+  button{padding:10px 14px;border:0;border-radius:10px;cursor:pointer;background:#6d5ef9;color:#fff;font-weight:700}
+  .secondary{background:#2b2b2b}
+  .danger{background:#ef4444}
+  .muted{color:#aaa;font-size:.9rem}
+  .value{min-width:3ch;display:inline-block;text-align:right}
+
+  /* Playlist list */
+  .list{list-style:none;margin:0;padding:0}
+  .item{
+    display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;
+    background:#0f0f0f;border:1px solid #272727;border-radius:10px;padding:10px;margin:8px 0;
+  }
+  .grab{cursor:grab;user-select:none;font-weight:700;padding:6px 8px;background:#1b1b1b;border-radius:8px}
+  .dragging{opacity:.6}
+  .u{width:100%}
+  .opt{width:240px}
+  .rm{background:#ef4444}
+  .prev{background:#10b981}
+  .edit{background:#334155}
+  .selected{outline:2px solid #6d5ef9}
+
+  /* Inspector */
+  .inspector-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .inspector-grid.full{grid-template-columns:1fr}
+  .badge{display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border-radius:999px;background:#1f2937;font-size:.85rem}
+
+  /* Import panel (non-modal, CAM-safe) */
+  .import-panel{display:none}
+  .import-panel.show{display:block}
 </style>
 </head>
 <body>
 
-<!-- Player -->
+<!-- Player (device renderer) -->
 <div id="player" class="stage" style="display:none">
-  <div id="box" class="deviceBox">
-    <img id="imgEl" class="media fade" alt="media">
-    <video id="vidEl" class="media fade" muted playsinline preload="auto"></video>
-  </div>
+  <img id="imgEl" class="media fade" alt="media">
+  <video id="vidEl" class="media fade" muted playsinline preload="auto"></video>
 </div>
 
 <!-- Configure -->
 <div id="config" class="wrap" style="display:none">
-  <h1>Kraken Media Slideshow — Configure</h1>
+  <h1>Kraken Media Slideshow - Configure</h1>
 
   <div class="card">
     <div class="actions" style="gap:10px;flex-wrap:wrap">
       <button id="add">Add item</button>
-      <button id="importTxt" class="secondary">Import from text</button>
+      <button id="toggleImport" class="secondary">Import from text</button>
       <button id="exportTxt" class="secondary">Export to text</button>
-      <label style="display:flex;align-items:center;gap:8px;margin-left:auto">
-        <input id="editMode" type="checkbox"> Edit mode (live preview)
-      </label>
       <button id="save">Save</button>
       <button id="load" class="secondary">Load</button>
       <button id="clear" class="secondary">Clear</button>
+      <button id="editMode" class="secondary" title="When on, selecting or changing an item previews it live on Kraken and playback is frozen.">Enter edit mode</button>
+    </div>
+    <div class="muted">Drag the ☰ handle to reorder. Click Edit to open settings. In edit mode, selecting or editing instantly previews on Kraken and playback is frozen until you save.</div>
+    <ul id="list" class="list"></ul>
+
+    <!-- Non-modal import panel -->
+    <div id="importPanel" class="import-panel card">
+      <label>Paste lines: URL [space] optional JSON</label>
+      <textarea id="importText" placeholder='https://example.com/image.webp\nhttps://example.com/clip.mp4 {"loop":true,"maxSeconds":8}'></textarea>
+      <div class="actions" style="margin-top:8px">
+        <button id="importApply">Import</button>
+        <button id="importCancel" class="secondary">Cancel</button>
+      </div>
     </div>
   </div>
 
   <!-- Per-item Inspector -->
   <div class="card" id="inspector" style="display:none">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:8px">
-      <div class="muted" id="insUrl" style="word-break:break-all"></div>
+      <div>
+        <div class="badge"><span id="insType">?</span> <span style="opacity:.7">selected item</span></div>
+        <div class="muted" id="insUrl" style="margin-top:6px;word-break:break-all"></div>
+      </div>
       <div class="actions">
         <button id="applyItem">Apply to item</button>
+        <button id="previewItem" class="secondary">Preview on Kraken</button>
         <button id="clearItem" class="danger">Clear item overrides</button>
       </div>
     </div>
-    <div class="grid cols-2">
+
+    <div class="inspector-grid">
       <div>
         <label>Per-image duration (seconds)</label>
         <input id="i_seconds" type="number" min="0" value="0">
+        <div class="muted">Only used for images; 0 uses global interval.</div>
       </div>
       <div>
-        <label>Video loop</label>
+        <label>Video: loop</label>
         <select id="i_loop">
           <option value="inherit">inherit</option>
           <option value="true">true</option>
           <option value="false">false</option>
         </select>
+        <div class="muted">Loop applies if max seconds = 0.</div>
       </div>
       <div>
-        <label>Video max seconds</label>
+        <label>Video: max seconds (0 = no cap)</label>
         <input id="i_maxSeconds" type="number" min="0" value="0">
       </div>
+    </div>
+
+    <div class="inspector-grid" style="margin-top:12px">
       <div>
         <label>Override zoom (%)</label>
         <input id="i_scale" type="number" min="10" max="500" value="">
+        <div class="muted">Blank inherits global.</div>
       </div>
       <div>
         <label>Override rotation (deg)</label>
@@ -94,9 +174,11 @@
         <input id="i_tyPct" type="number" min="-100" max="100" value="">
       </div>
     </div>
+
+    <div class="muted" style="margin-top:10px">Overrides are stored with the item. Blank or inherit falls back to global.</div>
   </div>
 
-  <!-- Global Options -->
+  <!-- Global Options (object-fit removed) -->
   <div class="card grid cols-2">
     <div>
       <label>Image interval (seconds)</label>
@@ -108,12 +190,12 @@
     </div>
     <div>
       <label>Background</label>
-      <input id="bg" type="text" value="#000000">
+      <input id="bg" type="text" value="#000000" placeholder="#000000 or black">
     </div>
   </div>
 
   <div class="card">
-    <h3>Circular screen</h3>
+    <h3 style="margin:0 0 10px">Circular screen targeting</h3>
     <div class="row">
       <div>
         <label>Shape</label>
@@ -125,42 +207,623 @@
       <div>
         <label>Circle padding (%)</label>
         <input id="pad" type="range" min="0" max="20" value="4">
-        <span id="padVal">4</span>%
+        <div class="muted">Padding: <span id="padVal" class="value">4</span>%</div>
+      </div>
+    </div>
+    <div class="row" style="margin-top:12px">
+      <div>
+        <label>Ring border width (px)</label>
+        <input id="ringW" type="number" min="0" value="0">
+      </div>
+      <div>
+        <label>Ring border color</label>
+        <input id="ringC" type="text" value="#222222">
       </div>
     </div>
   </div>
 
   <div class="card">
-    <h3>Global transform</h3>
+    <h3 style="margin:0 0 10px">Global crop and alignment</h3>
     <div class="row">
       <div>
-        <label>Zoom (%)</label>
+        <label>Zoom</label>
         <input id="scale" type="range" min="100" max="300" value="100">
-        <span id="scaleVal">100</span>%
+        <div class="muted">Scale: <span id="scaleVal" class="value">100</span>%</div>
       </div>
       <div>
         <label>Rotation (deg)</label>
         <input id="rot" type="range" min="-180" max="180" value="0">
-        <span id="rotVal">0</span>°
+        <div class="muted"><span id="rotVal" class="value">0</span>°</div>
       </div>
     </div>
-    <div class="row">
+    <div class="row" style="margin-top:12px">
       <div>
         <label>Offset X (%)</label>
         <input id="tx" type="range" min="-50" max="50" value="0">
-        <span id="txVal">0</span>%
+        <div class="muted"><span id="txVal" class="value">0</span>%</div>
       </div>
       <div>
         <label>Offset Y (%)</label>
         <input id="ty" type="range" min="-50" max="50" value="0">
-        <span id="tyVal">0</span>%
+        <div class="muted"><span id="tyVal" class="value">0</span>%</div>
       </div>
     </div>
   </div>
 </div>
 
 <script>
-/* removed all "fit" references in parsing and applying */
+  /* Storage keys */
+  const K_PLAYLIST = "krakenPlaylist";
+  const K_OPTIONS  = "krakenOptions";
+  const K_PREVIEW  = "krakenPreview";   // transient payload for per item preview
+  const K_CMD      = "krakenCommand";   // command channel (e.g., reset)
+  const K_EDIT     = "krakenEditMode";  // edit-mode flag for config UIs
+
+  const isKraken = new URLSearchParams(location.search).get("kraken") === "1";
+  document.getElementById(isKraken ? "player" : "config").style.display = isKraken ? "flex" : "block";
+
+  /* ---------- Helper utils ---------- */
+  const clamp = (v,min,max)=>Math.max(min,Math.min(max,v));
+  function inferType(url){ return /(\.(mp4|webm))(\?.*)?$/i.test(url) ? "video" : "image"; }
+  function parseItem(url, optStr){
+    const it = { src:url, type: inferType(url) };
+    if (optStr) { try { Object.assign(it, JSON.parse(optStr)); } catch {}
+    }
+    return it;
+  }
+  function itemToOptString(it){
+    const o = {};
+    if (it.type === "image" && it.seconds) o.seconds = it.seconds;
+    if (it.type === "video"){
+      if (typeof it.loop === "boolean") o.loop = it.loop;
+      if (it.maxSeconds) o.maxSeconds = it.maxSeconds;
+    }
+    // visual overrides if present
+    ["scale","rotDeg","txPct","tyPct"].forEach(k=>{
+      if (it[k] !== undefined && it[k] !== null && it[k] !== "") o[k] = it[k];
+    });
+    return Object.keys(o).length ? JSON.stringify(o) : "";
+  }
+  function mergeOpts(global, it){
+    const o = {...global};
+    ["scale","rotDeg","txPct","tyPct"].forEach(k=>{
+      if (it[k] !== undefined && it[k] !== null && it[k] !== "") o[k] = it[k];
+    });
+    return o;
+  }
+  function applyVisual(stageEl, imgEl, vidEl, o){
+    stageEl.style.setProperty('--bg',  o.bg || "#000");
+    stageEl.style.setProperty('--pad', (o.padPct||0) + '%');
+    stageEl.style.setProperty('--ringW', (o.ringW||0) + 'px');
+    stageEl.style.setProperty('--ringC', o.ringC || '#222');
+    stageEl.classList.toggle('circle', o.shape === 'circle');
+    [imgEl,vidEl].forEach(el=>{
+      el.style.setProperty('--scale', o.scale || 1);
+      el.style.setProperty('--rot',   (o.rotDeg||0) + 'deg');
+      el.style.setProperty('--tx',    (o.txPct||0) + '%');
+      el.style.setProperty('--ty',    (o.tyPct||0) + '%');
+    });
+  }
+
+  /* ============================================================
+     CONFIGURE MODE
+  ============================================================ */
+  if (!isKraken) {
+    const listEl = document.getElementById("list");
+    let selectedLi = null;
+    let editMode = localStorage.getItem(K_EDIT) === '1';
+
+    // Import panel
+    const importPanel = document.getElementById('importPanel');
+    const toggleImportBtn = document.getElementById('toggleImport');
+    toggleImportBtn.addEventListener('click', ()=>{
+      importPanel.classList.toggle('show');
+    });
+    document.getElementById('importCancel').addEventListener('click', ()=>{
+      importPanel.classList.remove('show');
+    });
+
+    function createItem(url="", opt=""){
+      const li = document.createElement("li");
+      li.className = "item";
+      li.draggable = true;
+      li.innerHTML = `
+        <div class="grab" title="Drag to reorder">☰</div>
+        <input class="u" type="text" placeholder="https://example.com/image.webp or video.mp4" value="${url.replace(/"/g,'&quot;')}">
+        <div style="display:flex;gap:10px;align-items:center">
+          <input class="opt" type="text" placeholder='Optional JSON (e.g. {"seconds":45} or {"loop":true,"maxSeconds":8})' value="${opt.replace(/"/g,'&quot;')}">
+          <button class="edit">Edit</button>
+          <button class="prev">Preview</button>
+          <button class="rm">Remove</button>
+        </div>
+      `;
+
+      /* Remove */
+      li.querySelector(".rm").addEventListener("click", ()=>{
+        if (selectedLi === li) { clearInspector(); }
+        li.remove();
+      });
+
+      /* Edit (select) */
+      li.querySelector(".edit").addEventListener("click", ()=>{
+        selectLi(li);
+        if (editMode) autoPreviewSelected();
+      });
+
+      /* Per-item Preview */
+      li.querySelector(".prev").addEventListener("click", ()=>{
+        const url = li.querySelector(".u").value.trim();
+        if (!url) return alert("Enter a URL first.");
+        const it = parseItem(url, li.querySelector(".opt").value.trim());
+        const opts = readGlobals(); // current unsaved globals
+        sendPreview(it, mergeOpts(opts, it), /*freeze*/ true);
+      });
+
+      /* Drag and drop */
+      li.addEventListener("dragstart", e=>{ li.classList.add("dragging"); e.dataTransfer.effectAllowed="move"; });
+      li.addEventListener("dragend",   ()=> li.classList.remove("dragging"));
+      li.addEventListener("dragover", e=>{
+        e.preventDefault();
+        const dragging = listEl.querySelector(".dragging");
+        if(!dragging || dragging === li) return;
+        const rect = li.getBoundingClientRect();
+        const before = e.clientY < rect.top + rect.height/2;
+        listEl.insertBefore(dragging, before ? li : li.nextSibling);
+      });
+
+      /* Clicking row background selects, and previews in edit mode */
+      li.addEventListener("click", (e)=>{
+        if (e.target.tagName === "INPUT" || e.target.tagName === "BUTTON") return;
+        selectLi(li);
+        if (editMode) autoPreviewSelected();
+      });
+
+      return li;
+    }
+
+    function autoPreviewSelected(){
+      if (!selectedLi) return;
+      const url = selectedLi.querySelector(".u").value.trim();
+      if (!url) return;
+      const it = parseItem(url, selectedLi.querySelector(".opt").value.trim());
+      const opts = readGlobals();
+      sendPreview(it, mergeOpts(opts, it), /*freeze*/ true);
+    }
+
+    function toModel(){
+      const items = [];
+      for (const li of listEl.querySelectorAll(".item")){
+        const url = li.querySelector(".u").value.trim();
+        if (!url) continue;
+        const it = parseItem(url, li.querySelector(".opt").value.trim());
+        items.push(it);
+      }
+      return items;
+    }
+    function fromModel(items){
+      listEl.innerHTML = "";
+      items.forEach(it=>{
+        listEl.appendChild(createItem(it.src, itemToOptString(it)));
+      });
+    }
+
+    /* Import/Export text */
+    function importText(text){
+      const lines=(text||"").split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
+      const items=[];
+      for(const line of lines){
+        const m = line.match(/^(\S+)(?:\s+(\{.*\}))?$/);
+        if(!m) continue;
+        items.push(parseItem(m[1], m[2]||""));
+      }
+      fromModel(items);
+    }
+    function exportText(){
+      return toModel().map(it=>{
+        const o = itemToOptString(it);
+        return it.src + (o ? " " + o : "");
+      }).join("\n");
+    }
+
+    document.getElementById('importApply').addEventListener('click', ()=>{
+      importText(document.getElementById('importText').value);
+      importPanel.classList.remove('show');
+    });
+
+    /* Global options form */
+    const els = {
+      interval: document.getElementById("interval"),
+      videoMax: document.getElementById("videoMax"),
+      bg:       document.getElementById("bg"),
+      shape:    document.getElementById("shape"),
+      pad:      document.getElementById("pad"),
+      padVal:   document.getElementById("padVal"),
+      ringW:    document.getElementById("ringW"),
+      ringC:    document.getElementById("ringC"),
+      scale:    document.getElementById("scale"),
+      scaleVal: document.getElementById("scaleVal"),
+      rot:      document.getElementById("rot"),
+      rotVal:   document.getElementById("rotVal"),
+      tx:       document.getElementById("tx"),
+      txVal:    document.getElementById("txVal"),
+      ty:       document.getElementById("ty"),
+      tyVal:    document.getElementById("tyVal"),
+    };
+    ["pad","scale","rot","tx","ty"].forEach(id=>{
+      document.getElementById(id).addEventListener("input", ()=>{
+        if(id==="pad") els.padVal.textContent = els.pad.value;
+        if(id==="scale") els.scaleVal.textContent = els.scale.value;
+        if(id==="rot") els.rotVal.textContent = els.rot.value;
+        if(id==="tx") els.txVal.textContent = els.tx.value;
+        if(id==="ty") els.tyVal.textContent = els.ty.value;
+        if (editMode) autoPreviewSelected();
+      });
+    });
+
+    function readGlobals(){
+      return {
+        interval: Math.max(1, parseInt(els.interval.value||"30",10)),
+        videoMax: Math.max(0, parseInt(els.videoMax.value||"0",10)),
+        bg:  els.bg.value || "#000000",
+        shape: els.shape.value,
+        padPct: parseInt(els.pad.value,10),
+        ringW: parseInt(els.ringW.value||"0",10),
+        ringC: els.ringC.value || "#222222",
+        scale: Math.max(0.01, (parseInt(els.scale.value,10)||100) / 100),
+        rotDeg: parseInt(els.rot.value,10)||0,
+        txPct: parseInt(els.tx.value,10)||0,
+        tyPct: parseInt(els.ty.value,10)||0,
+      };
+    }
+    function writeGlobals(o){
+      els.interval.value = o.interval ?? 30;
+      els.videoMax.value = o.videoMax ?? 0;
+      els.bg.value       = o.bg || "#000000";
+      els.shape.value    = o.shape || "circle";
+      els.pad.value      = o.padPct ?? 4; els.padVal.textContent = els.pad.value;
+      els.ringW.value    = o.ringW ?? 0;
+      els.ringC.value    = o.ringC || "#222222";
+      els.scale.value    = Math.round((o.scale ?? 1) * 100); els.scaleVal.textContent = els.scale.value;
+      els.rot.value      = o.rotDeg ?? 0; els.rotVal.textContent = els.rot.value;
+      els.tx.value       = o.txPct ?? 0;  els.txVal.textContent = els.tx.value;
+      els.ty.value       = o.tyPct ?? 0;  els.tyVal.textContent = els.ty.value;
+    }
+
+    /* Persistence */
+    function saveToLocal(){
+      localStorage.setItem(K_PLAYLIST, JSON.stringify(toModel()));
+      localStorage.setItem(K_OPTIONS, JSON.stringify(readGlobals()));
+      // Exit edit mode on save, reset device to start from item 1
+      setEditMode(false);
+      sendCommand('reset');
+      alert("Saved to this PC.");
+    }
+    function loadFromLocal(){
+      const items = JSON.parse(localStorage.getItem(K_PLAYLIST) || "[]");
+      const opts  = JSON.parse(localStorage.getItem(K_OPTIONS)  || "{}");
+      fromModel(items);
+      writeGlobals(opts);
+      if(!items.length){
+        importText(`https://www.gstatic.com/webp/gallery/1.webp
+https://media.giphy.com/media/l0HlQ7LRal8X9sWzO/giphy.gif
+https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4 {"loop":false,"maxSeconds":6}`);
+      }
+    }
+    function clearAll(){
+      localStorage.removeItem(K_PLAYLIST);
+      localStorage.removeItem(K_OPTIONS);
+      fromModel([]); writeGlobals({});
+      loadFromLocal();
+    }
+
+    /* Buttons */
+    document.getElementById("add").addEventListener("click", ()=> listEl.appendChild(createItem()));
+    document.getElementById("exportTxt").addEventListener("click", ()=>{
+      const t = exportText();
+      navigator.clipboard.writeText(t).catch(()=>{});
+      alert("Copied playlist text to clipboard.");
+    });
+    document.getElementById("save").addEventListener("click", saveToLocal);
+    document.getElementById("load").addEventListener("click", loadFromLocal);
+    document.getElementById("clear").addEventListener("click", clearAll);
+
+    // Edit mode toggle
+    const editBtn = document.getElementById('editMode');
+    function setEditMode(on){
+      editMode = !!on;
+      localStorage.setItem(K_EDIT, editMode ? '1' : '0');
+      editBtn.textContent = editMode ? 'Exit edit mode' : 'Enter edit mode';
+      if (!editMode) {
+        // Unfreeze playback by sending a non-freeze preview of current item? Not necessary.
+        // Just let device resume on its next tick.
+      } else {
+        // Immediately preview currently selected (if any)
+        autoPreviewSelected();
+      }
+    }
+    editBtn.addEventListener('click', ()=> setEditMode(!editMode));
+    setEditMode(editMode);
+
+    /* --------- Per-item Inspector --------- */
+    const ins = {
+      root: document.getElementById("inspector"),
+      type: document.getElementById("insType"),
+      url:  document.getElementById("insUrl"),
+      apply: document.getElementById("applyItem"),
+      preview: document.getElementById("previewItem"),
+      clear: document.getElementById("clearItem"),
+      seconds: document.getElementById("i_seconds"),
+      loop:    document.getElementById("i_loop"),
+      maxSeconds: document.getElementById("i_maxSeconds"),
+      scale:   document.getElementById("i_scale"),
+      rotDeg:  document.getElementById("i_rotDeg"),
+      txPct:   document.getElementById("i_txPct"),
+      tyPct:   document.getElementById("i_tyPct"),
+    };
+
+    function clearInspector(){
+      if (selectedLi) selectedLi.classList.remove("selected");
+      selectedLi = null;
+      ins.root.style.display = "none";
+    }
+
+    function loadInspectorFromLi(li){
+      const url = li.querySelector(".u").value.trim();
+      const raw = li.querySelector(".opt").value.trim();
+      const it  = parseItem(url, raw);
+      ins.type.textContent = (it.type || inferType(url)).toUpperCase();
+      ins.url.textContent = url || "(no url)";
+      // populate fields (blank = inherit)
+      ins.seconds.value   = it.type==="image" ? (it.seconds||0) : 0;
+      ins.loop.value      = (typeof it.loop === "boolean") ? String(it.loop) : "inherit";
+      ins.maxSeconds.value= it.maxSeconds || 0;
+      ins.scale.value     = (it.scale!=null) ? Math.round(it.scale*100) : "";
+      ins.rotDeg.value    = (it.rotDeg!=null) ? it.rotDeg : "";
+      ins.txPct.value     = (it.txPct!=null) ? it.txPct : "";
+      ins.tyPct.value     = (it.tyPct!=null) ? it.tyPct : "";
+    }
+
+    function writeLiFromInspector(li){
+      const url = li.querySelector(".u").value.trim();
+      if (!url) return alert("URL is required for this item.");
+      const type = inferType(url);
+      const it = parseItem(url, li.querySelector(".opt").value.trim()); // start with existing
+      it.type = type;
+
+      // seconds for images
+      const seconds = parseInt(ins.seconds.value||"0",10);
+      if (type==="image"){
+        if (seconds>0) it.seconds = seconds; else delete it.seconds;
+      } else {
+        delete it.seconds;
+      }
+
+      // video loop/maxSeconds
+      if (type==="video"){
+        const ms = parseInt(ins.maxSeconds.value||"0",10);
+        if (ms>0) it.maxSeconds = ms; else delete it.maxSeconds;
+        if (ins.loop.value==="true") it.loop = true;
+        else if (ins.loop.value==="false") it.loop = false;
+        else delete it.loop;
+      } else {
+        delete it.loop; delete it.maxSeconds;
+      }
+
+      // visual overrides
+      const s = ins.scale.value.trim();
+      if (s!==""){ it.scale = clamp(parseInt(s,10)/100, 0.01, 5); } else delete it.scale;
+
+      ["rotDeg","txPct","tyPct"].forEach(k=>{
+        const v = ins[k].value.trim();
+        if (v!=="") it[k] = parseInt(v,10); else delete it[k];
+      });
+
+      // write back to the JSON input for transparency
+      li.querySelector(".opt").value = itemToOptString(it);
+    }
+
+    function selectLi(li){
+      if (selectedLi) selectedLi.classList.remove("selected");
+      selectedLi = li;
+      li.classList.add("selected");
+      ins.root.style.display = "block";
+      loadInspectorFromLi(li);
+    }
+
+    ins.apply.addEventListener("click", ()=>{
+      if (!selectedLi) return;
+      writeLiFromInspector(selectedLi);
+      loadInspectorFromLi(selectedLi); // reflect normalization
+      if (editMode) autoPreviewSelected();
+    });
+
+    ins.clear.addEventListener("click", ()=>{
+      if (!selectedLi) return;
+      // wipe overrides by emptying opt JSON
+      selectedLi.querySelector(".opt").value = "";
+      loadInspectorFromLi(selectedLi);
+      if (editMode) autoPreviewSelected();
+    });
+
+    // Live preview button (always frozen)
+    ins.preview.addEventListener("click", ()=>{
+      if (!selectedLi) return;
+      writeLiFromInspector(selectedLi);
+      const url = selectedLi.querySelector(".u").value.trim();
+      if (!url) return alert("URL is required.");
+      const it = parseItem(url, selectedLi.querySelector(".opt").value.trim());
+      const opts = readGlobals();
+      sendPreview(it, mergeOpts(opts, it), /*freeze*/ true);
+    });
+
+    /* Init */
+    document.getElementById("config").style.display = "block";
+    loadFromLocal();
+  }
+
+  /* ============================================================
+     DEVICE MODE (kraken=1)
+  ============================================================ */
+  if (isKraken) {
+    const stage = document.getElementById("player");
+    const imgEl = document.getElementById("imgEl");
+    const vidEl = document.getElementById("vidEl");
+    stage.style.display = "flex";
+
+    let items = JSON.parse(localStorage.getItem(K_PLAYLIST) || "[]");
+    let o = Object.assign(
+      { interval:30, videoMax:0, bg:"#000000", shape:"circle", padPct:4, ringW:0, ringC:"#222",
+        scale:1, rotDeg:0, txPct:0, tyPct:0 },
+      JSON.parse(localStorage.getItem(K_OPTIONS) || "{}")
+    );
+
+    if(!items.length){
+      localStorage.setItem(K_PLAYLIST, JSON.stringify([
+        { src:"https://www.gstatic.com/webp/gallery/1.webp", type:"image" },
+        { src:"https://media.giphy.com/media/l0HlQ7LRal8X9sWzO/giphy.gif", type:"image" },
+        { src:"https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4", type:"video", loop:false }
+      ]));
+      location.reload();
+    }
+
+    let idx=0, timer=null, previewActive=false, lastPreviewTs=0, frozen=false;
+    const clearTimer=()=>{ if(timer){ clearTimeout(timer); timer=null; } };
+
+    function showImage(src, seconds, opts){
+      clearTimer();
+      applyVisual(stage, imgEl, vidEl, opts || o);
+      vidEl.pause(); vidEl.removeAttribute('src'); vidEl.load(); vidEl.classList.remove('show');
+      imgEl.src = src; imgEl.classList.add('show');
+      if (!(opts && opts.freeze)){
+        const s = Math.max(1, seconds || (opts?.interval ?? o.interval) || 30);
+        timer = setTimeout(next, s*1000);
+      }
+    }
+    function showVideo(src, entry, opts){
+      clearTimer();
+      applyVisual(stage, imgEl, vidEl, opts || o);
+      imgEl.classList.remove('show');
+      const maxSeconds = (opts?.videoMax || 0) || entry.maxSeconds || 0;
+      const loop = (entry.loop===true) && !maxSeconds;
+
+      vidEl.loop = loop;
+      vidEl.muted = true;
+      vidEl.controls = false;
+      vidEl.autoplay = true;
+      vidEl.src = src;
+      vidEl.classList.add('show');
+      const p = vidEl.play(); if(p && p.catch) p.catch(()=>setTimeout(()=>vidEl.play().catch(()=>{}),250));
+
+      function advance(){ vidEl.removeEventListener('ended', advance); next(); }
+      if(!(opts && opts.freeze)){
+        if(maxSeconds) timer = setTimeout(advance, Math.max(1,maxSeconds)*1000);
+        else if(!vidEl.loop) vidEl.addEventListener('ended', advance, { once:true });
+        else if(opts?.interval || o.interval) timer = setTimeout(advance, Math.max(1,(opts?.interval||o.interval))*1000);
+      }
+    }
+
+    function render(){
+      const it = items[idx]; if(!it) return;
+      const eff = mergeOpts(o, it); // per-item visual overrides
+      imgEl.classList.remove('fade'); vidEl.classList.remove('fade');
+      void imgEl.offsetWidth; void vidEl.offsetWidth;
+      imgEl.classList.add('fade'); vidEl.classList.add('fade');
+      if(it.type === 'video') showVideo(it.src, it, eff);
+      else showImage(it.src, it.seconds, eff);
+    }
+    function next(){
+      if (previewActive) {
+        previewActive = false; // one-shot preview finished, resume playlist (unless frozen)
+        // re-sync globals/playlist after preview
+        o = Object.assign(
+          { interval:30, videoMax:0, bg:"#000000", shape:"circle", padPct:4, ringW:0, ringC:"#222",
+            scale:1, rotDeg:0, txPct:0, tyPct:0 },
+          JSON.parse(localStorage.getItem(K_OPTIONS) || "{}")
+        );
+        items = JSON.parse(localStorage.getItem(K_PLAYLIST) || "[]") || items;
+      } else {
+        idx = (idx + 1) % items.length;
+      }
+      render();
+    }
+
+    render();
+
+    function tryActivatePreview(raw){
+      if (!raw) return;
+      let payload; try { payload = JSON.parse(raw); } catch { return; }
+      if (!payload || payload.kind !== "preview") return;
+      if (payload.ts <= lastPreviewTs) return;
+      if (payload.ttlMs && (Date.now() - payload.ts > payload.ttlMs)) return;
+
+      lastPreviewTs = payload.ts;
+      previewActive = true;
+      frozen = !!(payload.options && payload.options.freeze);
+      clearTimer();
+
+      const it = payload.item;
+      const opts = payload.options || o;
+      imgEl.classList.remove('fade'); vidEl.classList.remove('fade');
+      void imgEl.offsetWidth; void vidEl.offsetWidth;
+      imgEl.classList.add('fade'); vidEl.classList.add('fade');
+
+      if (inferType(it.src) === "video") showVideo(it.src, it, opts);
+      else showImage(it.src, it.seconds, opts);
+    }
+
+    function handleCommand(cmd){
+      switch(cmd){
+        case 'reset':
+          clearTimer(); previewActive=false; frozen=false; idx=0; render();
+          break;
+      }
+    }
+
+    window.addEventListener("storage", (e)=>{
+      if (e.key === K_PREVIEW && e.newValue) tryActivatePreview(e.newValue);
+      if (e.key === K_CMD && e.newValue) { try { const {cmd}=JSON.parse(e.newValue)||{}; if(cmd) handleCommand(cmd); } catch {}
+      }
+      if (!previewActive && e.key === K_OPTIONS) {
+        o = Object.assign(
+          { interval:30, videoMax:0, bg:"#000000", shape:"circle", padPct:4, ringW:0, ringC:"#222",
+            scale:1, rotDeg:0, txPct:0, tyPct:0 },
+          JSON.parse(localStorage.getItem(K_OPTIONS) || "{}")
+        );
+      }
+      if (!previewActive && e.key === K_PLAYLIST) {
+        items = JSON.parse(localStorage.getItem(K_PLAYLIST) || "[]") || items;
+      }
+    });
+
+    try {
+      const bc = new BroadcastChannel("krakenChannel");
+      bc.onmessage = (ev)=>{
+        if (ev?.data?.type === "preview" && ev.data.payload) {
+          tryActivatePreview(JSON.stringify(ev.data.payload));
+        }
+        if (ev?.data?.type === 'command' && ev.data.cmd){ handleCommand(ev.data.cmd); }
+      };
+    } catch {}
+    tryActivatePreview(localStorage.getItem(K_PREVIEW));
+  }
+
+  /* ===== Shared helpers used by config to talk to device ===== */
+  function sendPreview(it, options, freeze){
+    const payload = {
+      kind: "preview",
+      ts: Date.now(),
+      options: Object.assign({}, options || {}, { freeze: !!freeze }),
+      item: it,
+      ttlMs: 120000
+    };
+    try { localStorage.setItem(K_PREVIEW, JSON.stringify(payload)); } catch {}
+    try { const bc = new BroadcastChannel("krakenChannel"); bc.postMessage({type:"preview",payload}); setTimeout(()=>bc.close(),300); } catch {}
+  }
+  function sendCommand(cmd){
+    const msg = { cmd };
+    try { localStorage.setItem(K_CMD, JSON.stringify(msg)); } catch {}
+    try { const bc = new BroadcastChannel("krakenChannel"); bc.postMessage({type:'command', cmd}); setTimeout(()=>bc.close(),300); } catch {}
+  }
 </script>
 </body>
 </html>
