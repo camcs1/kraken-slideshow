@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Kraken Media Slideshow (no circle mask)</title>
+<title>Kraken Media Slideshow (edit mode live preview)</title>
 <style>
   html,body{height:100%;margin:0}
   body{background:#000;color:#eaeaea;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
@@ -14,10 +14,9 @@
     display:flex;align-items:center;justify-content:center;
     background:var(--bg,#000);
   }
-
   .media{position:absolute;inset:0;margin:auto;max-width:100%;max-height:100%;display:none}
   .show{display:block}
-  .fade{transition:opacity 300ms ease;opacity:0}
+  .fade{transition:opacity 250ms ease;opacity:0}
   .fade.show{opacity:1}
   .contain{object-fit:contain}
   .cover{object-fit:cover}
@@ -31,7 +30,7 @@
 
   /* ===== Configure UI ===== */
   .wrap{max-width:1200px;margin:24px auto;padding:0 16px}
-  h1{font-size:1.25rem;margin:0 0 14px}
+  h1{font-size:1.2rem;margin:0 0 14px}
   .grid{display:grid;gap:12px}
   .cols-2{grid-template-columns:1fr 1fr}
   .card{background:#121212;border-radius:12px;padding:16px;box-shadow:0 6px 20px rgba(0,0,0,.25);margin-bottom:14px}
@@ -39,7 +38,7 @@
   input[type="text"],input[type="number"],textarea,select{width:100%;padding:10px;border-radius:8px;border:1px solid #333;background:#0e0e0e;color:#eaeaea}
   textarea{min-height:120px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
   .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-  .actions{display:flex;gap:10px;flex-wrap:wrap}
+  .actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
   button{padding:10px 14px;border:0;border-radius:10px;cursor:pointer;background:#6d5ef9;color:#fff;font-weight:700}
   .secondary{background:#2b2b2b}
   .danger{background:#ef4444}
@@ -57,7 +56,6 @@
   .u{width:100%}
   .opt{width:260px}
   .rm{background:#ef4444}
-  .prev{background:#10b981}
   .edit{background:#334155}
   .selected{outline:2px solid #6d5ef9}
 
@@ -100,15 +98,17 @@
   <h1>Kraken Media Slideshow — Configure</h1>
 
   <div class="card">
-    <div class="actions" style="gap:10px;flex-wrap:wrap">
+    <div class="actions">
       <button id="add">Add item</button>
       <button id="importTxt" class="secondary">Import from text</button>
       <button id="exportTxt" class="secondary">Export to text</button>
+      <span style="flex:1"></span>
+      <button id="editModeBtn" class="secondary" title="Toggle edit mode">Enter Edit Mode</button>
       <button id="save">Save</button>
       <button id="load" class="secondary">Load</button>
       <button id="clear" class="secondary">Clear</button>
     </div>
-    <div class="muted">Drag the ☰ handle to reorder. Click <b>Edit</b> to tweak per-item settings, or <b>Preview</b> to show that item on the Kraken immediately.</div>
+    <div class="muted">Drag the ☰ handle to reorder. Select a row and tweak settings in the inspector. In <b>Edit Mode</b>, the Kraken shows the selected item live. Any change updates the preview immediately. Press <b>Save</b> to exit Edit Mode and resume the slideshow.</div>
     <ul id="list" class="list"></ul>
   </div>
 
@@ -121,7 +121,6 @@
       </div>
       <div class="actions">
         <button id="applyItem">Apply to item</button>
-        <button id="previewItem" class="secondary">Preview on Kraken</button>
         <button id="clearItem" class="danger">Clear item overrides</button>
       </div>
     </div>
@@ -174,7 +173,7 @@
       </div>
     </div>
 
-    <div class="muted" style="margin-top:10px">Overrides are stored in the item JSON. Blank/“inherit” falls back to global settings.</div>
+    <div class="muted" style="margin-top:10px">Overrides are saved in the item JSON. Blank/“inherit” falls back to global settings.</div>
   </div>
 
   <!-- Global Options -->
@@ -245,10 +244,10 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
 </div>
 
 <script>
-  /* Storage keys */
+  /* Storage keys + channel */
   const K_PLAYLIST = "krakenPlaylist";
   const K_OPTIONS  = "krakenOptions";
-  const K_PREVIEW  = "krakenPreview";   // transient payload for per-item preview to device
+  const K_EDIT     = "krakenEdit";      // messages for edit-mode live preview
 
   const isKraken = new URLSearchParams(location.search).get("kraken") === "1";
   document.getElementById(isKraken ? "player" : "config").style.display = isKraken ? "flex" : "block";
@@ -293,6 +292,12 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
       el.style.setProperty('--ty',    (o.tyPct||0) + '%');
     });
   }
+  function postEditMessage(msg){
+    // Persist for storage event fallback
+    try { localStorage.setItem(K_EDIT, JSON.stringify({ts:Date.now(), ...msg})); } catch {}
+    // BroadcastChannel if available
+    try { const bc = new BroadcastChannel("krakenChannel"); bc.postMessage({type:"edit", ...msg}); setTimeout(()=>bc.close(),200); } catch {}
+  }
 
   /* ============================================================
      CONFIGURE MODE
@@ -300,8 +305,9 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
   if (!isKraken) {
     const listEl = document.getElementById("list");
     let selectedLi = null;
+    let editMode = false;
 
-    /* ---- Playlist rows (drag, edit, preview, remove) ---- */
+    /* ---- Playlist rows (drag, edit, remove) ---- */
     function createItem(url="", opt=""){
       const li = document.createElement("li");
       li.className = "item";
@@ -312,36 +318,20 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
         <div style="display:flex;gap:10px;align-items:center">
           <input class="opt" type="text" placeholder='Optional JSON (e.g. {"seconds":45} or {"loop":true,"maxSeconds":8})' value="${opt.replace(/"/g,'&quot;')}">
           <button class="edit">Edit</button>
-          <button class="prev">Preview</button>
           <button class="rm">Remove</button>
         </div>
       `;
 
       /* Remove */
       li.querySelector(".rm").addEventListener("click", ()=>{
-        if (selectedLi === li) { clearInspector(); }
+        const wasSelected = (selectedLi === li);
         li.remove();
+        if (wasSelected) clearInspector();
+        if (editMode && wasSelected) maybePreviewSelected(); // no selection -> no preview
       });
 
       /* Edit (select) */
       li.querySelector(".edit").addEventListener("click", ()=> selectLi(li));
-
-      /* Per-item Preview to ?kraken=1 page */
-      li.querySelector(".prev").addEventListener("click", ()=>{
-        const url = li.querySelector(".u").value.trim();
-        if (!url) return alert("Enter a URL first.");
-        const it = parseItem(url, li.querySelector(".opt").value.trim());
-        const opts = readGlobals(); // current (unsaved) globals
-        const payload = {
-          kind: "preview",
-          ts: Date.now(),
-          options: mergeOpts(opts, it),
-          item: it,
-          ttlMs: 120000
-        };
-        try { localStorage.setItem(K_PREVIEW, JSON.stringify(payload)); } catch {}
-        try { const bc = new BroadcastChannel("krakenChannel"); bc.postMessage({type:"preview",payload}); setTimeout(()=>bc.close(),300); } catch {}
-      });
 
       /* Drag and drop */
       li.addEventListener("dragstart", e=>{ li.classList.add("dragging"); e.dataTransfer.effectAllowed="move"; });
@@ -359,6 +349,14 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
       li.addEventListener("click", (e)=>{
         if (e.target.tagName === "INPUT" || e.target.tagName === "BUTTON") return;
         selectLi(li);
+      });
+
+      /* URL/options change should reflect inspector and preview (if selected) */
+      li.querySelector(".u").addEventListener("change", ()=>{
+        if (li === selectedLi){ loadInspectorFromLi(li); if(editMode) maybePreviewSelected(); }
+      });
+      li.querySelector(".opt").addEventListener("change", ()=>{
+        if (li === selectedLi){ loadInspectorFromLi(li); if(editMode) maybePreviewSelected(); }
       });
 
       return li;
@@ -391,6 +389,8 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
         items.push(parseItem(m[1], m[2]||""));
       }
       fromModel(items);
+      // If in edit mode and something is selected, refresh preview
+      if (editMode && selectedLi) maybePreviewSelected();
     }
     function exportText(){
       return toModel().map(it=>{
@@ -420,6 +420,12 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
         if(id==="rot") els.rotVal.textContent = els.rot.value;
         if(id==="tx") els.txVal.textContent = els.tx.value;
         if(id==="ty") els.tyVal.textContent = els.ty.value;
+        if (editMode) maybePreviewSelected(); // live update during edit mode
+      });
+    });
+    ["interval","videoMax","fit","bg"].forEach(id=>{
+      document.getElementById(id).addEventListener("change", ()=>{
+        if (editMode) maybePreviewSelected();
       });
     });
 
@@ -450,7 +456,9 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
     function saveToLocal(){
       localStorage.setItem(K_PLAYLIST, JSON.stringify(toModel()));
       localStorage.setItem(K_OPTIONS, JSON.stringify(readGlobals()));
-      alert("Saved to this PC.");
+      // Exit edit mode and tell device to resume slideshow
+      if (editMode) toggleEditMode(false, true);
+      else alert("Saved to this PC.");
     }
     function loadFromLocal(){
       const items = JSON.parse(localStorage.getItem(K_PLAYLIST) || "[]");
@@ -487,19 +495,9 @@ https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4 {"loop"
     const importTextarea = document.getElementById("importTextarea");
     const importDo = document.getElementById("importDo");
     const importCancel = document.getElementById("importCancel");
-
-    function openImport(text=""){
-      importTextarea.value = text || "";
-      importOverlay.style.display = "flex";
-      setTimeout(()=>importTextarea.focus(), 0);
-    }
+    function openImport(text=""){ importTextarea.value = text || ""; importOverlay.style.display = "flex"; setTimeout(()=>importTextarea.focus(), 0); }
     function closeImport(){ importOverlay.style.display = "none"; }
-    function doImport(){
-      const t = importTextarea.value.trim();
-      if (!t) { closeImport(); return; }
-      importText(t);
-      closeImport();
-    }
+    function doImport(){ const t = importTextarea.value.trim(); if (!t) { closeImport(); return; } importText(t); closeImport(); }
     importBtn.addEventListener("click", ()=> openImport());
     importDo.addEventListener("click", doImport);
     importCancel.addEventListener("click", closeImport);
@@ -515,7 +513,6 @@ https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4 {"loop"
       type: document.getElementById("insType"),
       url:  document.getElementById("insUrl"),
       apply: document.getElementById("applyItem"),
-      preview: document.getElementById("previewItem"),
       clear: document.getElementById("clearItem"),
       seconds: document.getElementById("i_seconds"),
       loop:    document.getElementById("i_loop"),
@@ -580,28 +577,54 @@ https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4 {"loop"
       li.classList.add("selected");
       ins.root.style.display = "block";
       loadInspectorFromLi(li);
+      if (editMode) maybePreviewSelected();
     }
+
+    function getSelectedItemAndOptions(){
+      if (!selectedLi) return null;
+      const url = selectedLi.querySelector(".u").value.trim();
+      if (!url) return null;
+      const it = parseItem(url, selectedLi.querySelector(".opt").value.trim());
+      const opts = readGlobals();
+      return { it, opts: mergeOpts(opts, it) };
+    }
+
+    function maybePreviewSelected(){
+      const data = getSelectedItemAndOptions();
+      if (!editMode || !data) return;
+      postEditMessage({ action:"update", item:data.it, options:data.opts });
+    }
+
     ins.apply.addEventListener("click", ()=>{
       if (!selectedLi) return;
       writeLiFromInspector(selectedLi);
       loadInspectorFromLi(selectedLi);
+      if (editMode) maybePreviewSelected();
     });
     ins.clear.addEventListener("click", ()=>{
       if (!selectedLi) return;
       selectedLi.querySelector(".opt").value = "";
       loadInspectorFromLi(selectedLi);
+      if (editMode) maybePreviewSelected();
     });
-    ins.preview.addEventListener("click", ()=>{
-      if (!selectedLi) return;
-      writeLiFromInspector(selectedLi);
-      const url = selectedLi.querySelector(".u").value.trim();
-      if (!url) return alert("URL is required.");
-      const it = parseItem(url, selectedLi.querySelector(".opt").value.trim());
-      const opts = readGlobals();
-      const payload = { kind:"preview", ts:Date.now(), options: mergeOpts(opts, it), item: it, ttlMs: 120000 };
-      try { localStorage.setItem(K_PREVIEW, JSON.stringify(payload)); } catch {}
-      try { const bc = new BroadcastChannel("krakenChannel"); bc.postMessage({type:"preview",payload}); setTimeout(()=>bc.close(),300); } catch {}
-    });
+
+    /* ---- Edit mode toggle ---- */
+    const editBtn = document.getElementById("editModeBtn");
+    function toggleEditMode(on, fromSave=false){
+      editMode = on;
+      editBtn.textContent = on ? "Exit Edit Mode" : "Enter Edit Mode";
+      if (on){
+        // start edit session and show current selection (or none)
+        const data = getSelectedItemAndOptions();
+        postEditMessage({ action:"start", item: data?.it || null, options: data?.opts || readGlobals() });
+        if (data) postEditMessage({ action:"update", item:data.it, options:data.opts });
+      } else {
+        // tell device to resume slideshow; if from Save, also say "Saved" after resume ping
+        postEditMessage({ action:"end" });
+        if (fromSave) alert("Saved and exited Edit Mode.");
+      }
+    }
+    editBtn.addEventListener("click", ()=> toggleEditMode(!editMode));
 
     /* Init Configure mode */
     document.getElementById("config").style.display = "block";
@@ -609,7 +632,7 @@ https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4 {"loop"
   }
 
   /* ============================================================
-     DEVICE MODE (kraken=1) — plays saved playlist, listens for previews
+     DEVICE MODE (kraken=1) — plays saved playlist, supports edit mode live preview
   ============================================================ */
   if (isKraken) {
     const stage = document.getElementById("player");
@@ -633,18 +656,23 @@ https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4 {"loop"
       location.reload();
     }
 
-    let idx=0, timer=null, previewActive=false, lastPreviewTs=0;
+    let idx=0, timer=null;
+    let editMode=false;        // if true, we freeze slideshow timers
+    let lastMsgTs=0;
+
     const clearTimer=()=>{ if(timer){ clearTimeout(timer); timer=null; } };
 
-    function showImage(src, seconds, opts){
+    function showImage(src, seconds, opts, advance=true){
       clearTimer();
       applyVisual(stage, imgEl, vidEl, opts || o);
       vidEl.pause(); vidEl.removeAttribute('src'); vidEl.load(); vidEl.classList.remove('show');
       imgEl.src = src; imgEl.classList.add('show');
-      const s = Math.max(1, seconds || (opts?.interval ?? o.interval) || 30);
-      timer = setTimeout(next, s*1000);
+      if (!editMode && advance){
+        const s = Math.max(1, seconds || (opts?.interval ?? o.interval) || 30);
+        timer = setTimeout(next, s*1000);
+      }
     }
-    function showVideo(src, entry, opts){
+    function showVideo(src, entry, opts, advance=true){
       clearTimer();
       applyVisual(stage, imgEl, vidEl, opts || o);
       imgEl.classList.remove('show');
@@ -659,15 +687,17 @@ https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4 {"loop"
       vidEl.classList.add('show');
       const p = vidEl.play(); if(p && p.catch) p.catch(()=>setTimeout(()=>vidEl.play().catch(()=>{}),250));
 
-      function advance(){ vidEl.removeEventListener('ended', advance); next(); }
-      if(maxSeconds) timer = setTimeout(advance, Math.max(1,maxSeconds)*1000);
-      else if(!vidEl.loop) vidEl.addEventListener('ended', advance, { once:true });
-      else if(opts?.interval || o.interval) timer = setTimeout(advance, Math.max(1,(opts?.interval||o.interval))*1000);
+      function advanceNow(){ vidEl.removeEventListener('ended', advanceNow); next(); }
+      if (!editMode && advance){
+        if(maxSeconds) timer = setTimeout(advanceNow, Math.max(1,maxSeconds)*1000);
+        else if(!vidEl.loop) vidEl.addEventListener('ended', advanceNow, { once:true });
+        else if(opts?.interval || o.interval) timer = setTimeout(advanceNow, Math.max(1,(opts?.interval||o.interval))*1000);
+      }
     }
 
     function render(){
       const it = items[idx]; if(!it) return;
-      const eff = mergeOpts(o, it); // per-item visual overrides
+      const eff = mergeOpts(o, it);
       imgEl.classList.remove('fade'); vidEl.classList.remove('fade');
       void imgEl.offsetWidth; void vidEl.offsetWidth;
       imgEl.classList.add('fade'); vidEl.classList.add('fade');
@@ -675,54 +705,66 @@ https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4 {"loop"
       else showImage(it.src, it.seconds, eff);
     }
     function next(){
-      if (previewActive) {
-        previewActive = false;
-        // re-sync globals/playlist after preview
+      idx = (idx + 1) % items.length;
+      render();
+    }
+
+    render();
+
+    /* ---- Respond to edit-mode messages ---- */
+    function handleEditMessage(msg){
+      if (!msg || !msg.action) return;
+      if (msg.ts && msg.ts <= lastMsgTs) return;
+      lastMsgTs = msg.ts || Date.now();
+
+      if (msg.action === "start"){
+        editMode = true;
+        clearTimer();
+        // If a starting item is provided, show it, else keep current frame frozen
+        if (msg.item){
+          const it = msg.item;
+          const opts = msg.options || o;
+          if (inferType(it.src) === "video") showVideo(it.src, it, opts, false);
+          else showImage(it.src, it.seconds, opts, false);
+        }
+      }
+      else if (msg.action === "update"){
+        editMode = true; // ensure
+        clearTimer();
+        const it = msg.item;
+        const opts = msg.options || o;
+        imgEl.classList.remove('fade'); vidEl.classList.remove('fade');
+        void imgEl.offsetWidth; void vidEl.offsetWidth;
+        imgEl.classList.add('fade'); vidEl.classList.add('fade');
+        if (inferType(it.src) === "video") showVideo(it.src, it, opts, false);
+        else showImage(it.src, it.seconds, opts, false);
+      }
+      else if (msg.action === "end"){
+        // Exit edit mode and resume slideshow using latest saved playlist/options
+        editMode = false;
         o = Object.assign(
           { interval:30, videoMax:0, fit:"contain", bg:"#000000",
             scale:1, rotDeg:0, txPct:0, tyPct:0 },
           JSON.parse(localStorage.getItem(K_OPTIONS) || "{}")
         );
         items = JSON.parse(localStorage.getItem(K_PLAYLIST) || "[]") || items;
-      } else {
-        idx = (idx + 1) % items.length;
+        clearTimer();
+        render();
       }
-      render();
-    }
-
-    render();
-
-    function tryActivatePreview(raw){
-      if (!raw) return;
-      let payload; try { payload = JSON.parse(raw); } catch { return; }
-      if (!payload || payload.kind !== "preview") return;
-      if (payload.ts <= lastPreviewTs) return;
-      if (payload.ttlMs && (Date.now() - payload.ts > payload.ttlMs)) return;
-
-      lastPreviewTs = payload.ts;
-      previewActive = true;
-      clearTimer();
-
-      const it = payload.item;
-      const opts = payload.options || o;
-      imgEl.classList.remove('fade'); vidEl.classList.remove('fade');
-      void imgEl.offsetWidth; void vidEl.offsetWidth;
-      imgEl.classList.add('fade'); vidEl.classList.add('fade');
-
-      if (inferType(it.src) === "video") showVideo(it.src, it, opts);
-      else showImage(it.src, it.seconds, opts);
     }
 
     window.addEventListener("storage", (e)=>{
-      if (e.key === K_PREVIEW && e.newValue) tryActivatePreview(e.newValue);
-      if (!previewActive && e.key === K_OPTIONS) {
+      if (e.key === K_EDIT && e.newValue){
+        try { handleEditMessage(JSON.parse(e.newValue)); } catch {}
+      }
+      if (!editMode && e.key === K_OPTIONS) {
         o = Object.assign(
           { interval:30, videoMax:0, fit:"contain", bg:"#000000",
             scale:1, rotDeg:0, txPct:0, tyPct:0 },
           JSON.parse(localStorage.getItem(K_OPTIONS) || "{}")
         );
       }
-      if (!previewActive && e.key === K_PLAYLIST) {
+      if (!editMode && e.key === K_PLAYLIST) {
         items = JSON.parse(localStorage.getItem(K_PLAYLIST) || "[]") || items;
       }
     });
@@ -730,12 +772,9 @@ https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4 {"loop"
     try {
       const bc = new BroadcastChannel("krakenChannel");
       bc.onmessage = (ev)=>{
-        if (ev?.data?.type === "preview" && ev.data.payload) {
-          tryActivatePreview(JSON.stringify(ev.data.payload));
-        }
+        if (ev?.data?.type === "edit") handleEditMessage({ ts:Date.now(), ...ev.data });
       };
     } catch {}
-    tryActivatePreview(localStorage.getItem(K_PREVIEW));
   }
 </script>
 </body>
