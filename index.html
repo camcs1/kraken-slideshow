@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Kraken Media Slideshow (drag-drop + preview)</title>
+<title>Kraken Media Slideshow (per-item editor + preview)</title>
 <style>
   html,body{height:100%;margin:0}
   body{background:#000;color:#eaeaea;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
@@ -41,10 +41,11 @@
   }
 
   /* ===== Configure UI ===== */
-  .wrap{max-width:1000px;margin:24px auto;padding:0 16px}
+  .wrap{max-width:1200px;margin:24px auto;padding:0 16px}
   h1{font-size:1.25rem;margin:0 0 14px}
   .grid{display:grid;gap:12px}
   .cols-2{grid-template-columns:1fr 1fr}
+  .cols-3{grid-template-columns:2fr 1fr 1fr}
   .card{background:#121212;border-radius:12px;padding:16px;box-shadow:0 6px 20px rgba(0,0,0,.25);margin-bottom:14px}
   label{display:block;margin:8px 0 6px;font-weight:600}
   input[type="text"],input[type="number"],textarea,select{width:100%;padding:10px;border-radius:8px;border:1px solid #333;background:#0e0e0e;color:#eaeaea}
@@ -52,6 +53,10 @@
   .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
   .actions{display:flex;gap:10px;flex-wrap:wrap}
   button{padding:10px 14px;border:0;border-radius:10px;cursor:pointer;background:#6d5ef9;color:#fff;font-weight:700}
+  .secondary{background:#2b2b2b}
+  .danger{background:#ef4444}
+  .muted{color:#aaa;font-size:.9rem}
+  .value{min-width:3ch;display:inline-block;text-align:right}
 
   /* Playlist list */
   .list{list-style:none;margin:0;padding:0}
@@ -64,18 +69,21 @@
   .u{width:100%}
   .opt{width:240px}
   .rm{background:#ef4444}
-  .muted{color:#aaa;font-size:.9rem}
-  .value{min-width:3ch;display:inline-block;text-align:right}
+  .prev{background:#10b981}
+  .edit{background:#334155}
+  .selected{outline:2px solid #6d5ef9}
 
-  /* Preview pane inside Configure */
-  .previewPane{position:relative;height:380px;background:#000;border-radius:12px;overflow:hidden;display:none}
-  .bar{display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap}
-  .secondary{background:#2b2b2b}
+  /* Inspector */
+  .inspector-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .inspector-grid.full{grid-template-columns:1fr}
+  .badge{display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border-radius:999px;background:#1f2937;font-size:.85rem}
+
+  /* Player visibility in config preview (optional, not used here) */
 </style>
 </head>
 <body>
 
-<!-- Player (device or preview) -->
+<!-- Player (device renderer) -->
 <div id="player" class="stage" style="display:none">
   <img id="imgEl" class="media fade contain" alt="media">
   <video id="vidEl" class="media fade contain" muted playsinline preload="auto"></video>
@@ -86,20 +94,85 @@
   <h1>Kraken Media Slideshow — Configure</h1>
 
   <div class="card">
-    <div class="bar">
+    <div class="actions" style="gap:10px;flex-wrap:wrap">
       <button id="add">Add item</button>
       <button id="importTxt" class="secondary">Import from text</button>
       <button id="exportTxt" class="secondary">Export to text</button>
-      <button id="preview" class="secondary">Preview</button>
-      <button id="back" class="secondary" style="display:none">Back to editor</button>
       <button id="save">Save</button>
       <button id="load" class="secondary">Load</button>
       <button id="clear" class="secondary">Clear</button>
     </div>
-    <div class="muted">Drag the handle to reorder. URL is required. Options are optional JSON for videos or per-image seconds.</div>
+    <div class="muted">Drag the ☰ handle to reorder. Click **Edit** on any row to open its settings in the inspector.</div>
     <ul id="list" class="list"></ul>
   </div>
 
+  <!-- Per-item Inspector -->
+  <div class="card" id="inspector" style="display:none">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:8px">
+      <div>
+        <div class="badge"><span id="insType">?</span> <span style="opacity:.7">selected item</span></div>
+        <div class="muted" id="insUrl" style="margin-top:6px;word-break:break-all"></div>
+      </div>
+      <div class="actions">
+        <button id="applyItem">Apply to item</button>
+        <button id="previewItem" class="secondary">Preview on Kraken</button>
+        <button id="clearItem" class="danger">Clear item overrides</button>
+      </div>
+    </div>
+
+    <div class="inspector-grid">
+      <div>
+        <label>Per-image duration (seconds)</label>
+        <input id="i_seconds" type="number" min="0" value="0">
+        <div class="muted">Only used for images; 0 = use global interval.</div>
+      </div>
+      <div>
+        <label>Video: loop</label>
+        <select id="i_loop">
+          <option value="inherit">inherit</option>
+          <option value="true">true</option>
+          <option value="false">false</option>
+        </select>
+        <div class="muted">Loop applies if max seconds = 0.</div>
+      </div>
+      <div>
+        <label>Video: max seconds (0 = no cap)</label>
+        <input id="i_maxSeconds" type="number" min="0" value="0">
+      </div>
+      <div>
+        <label>Override fit</label>
+        <select id="i_fit">
+          <option value="inherit">inherit</option>
+          <option value="contain">contain</option>
+          <option value="cover">cover</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="inspector-grid" style="margin-top:12px">
+      <div>
+        <label>Override zoom (%)</label>
+        <input id="i_scale" type="number" min="10" max="500" value="">
+        <div class="muted">Blank = inherit global.</div>
+      </div>
+      <div>
+        <label>Override rotation (deg)</label>
+        <input id="i_rotDeg" type="number" min="-180" max="180" value="">
+      </div>
+      <div>
+        <label>Override offset X (%)</label>
+        <input id="i_txPct" type="number" min="-100" max="100" value="">
+      </div>
+      <div>
+        <label>Override offset Y (%)</label>
+        <input id="i_tyPct" type="number" min="-100" max="100" value="">
+      </div>
+    </div>
+
+    <div class="muted" style="margin-top:10px">Overrides are stored inside the item JSON. Anything left blank or set to “inherit” falls back to global settings.</div>
+  </div>
+
+  <!-- Global Options -->
   <div class="card grid cols-2">
     <div>
       <label>Image interval (seconds)</label>
@@ -151,7 +224,7 @@
   </div>
 
   <div class="card">
-    <h3 style="margin:0 0 10px">Crop and alignment</h3>
+    <h3 style="margin:0 0 10px">Global crop and alignment</h3>
     <div class="row">
       <div>
         <label>Zoom</label>
@@ -177,230 +250,49 @@
       </div>
     </div>
   </div>
-
-  <div id="previewPane" class="card previewPane">
-    <!-- The same player renders here for live preview -->
-    <div id="previewStage" class="stage" style="height:100%">
-      <img id="pImg" class="media fade contain" alt="media">
-      <video id="pVid" class="media fade contain" muted playsinline preload="auto"></video>
-    </div>
-  </div>
 </div>
 
 <script>
   /* Storage keys */
   const K_PLAYLIST = "krakenPlaylist";
   const K_OPTIONS  = "krakenOptions";
+  const K_PREVIEW  = "krakenPreview";   // transient payload for per item preview
 
   const isKraken = new URLSearchParams(location.search).get("kraken") === "1";
   document.getElementById(isKraken ? "player" : "config").style.display = isKraken ? "flex" : "block";
 
-  /* ---------- Playlist UI with drag and drop ---------- */
-  const listEl = document.getElementById("list");
-
-  function createItem(url="", opt=""){
-    const li = document.createElement("li");
-    li.className = "item";
-    li.draggable = true;
-    li.innerHTML = `
-      <div class="grab" title="Drag to reorder">☰</div>
-      <input class="u" type="text" placeholder="https://example.com/image.webp or video.mp4" value="${url.replace(/"/g,'&quot;')}">
-      <div style="display:flex;gap:10px;align-items:center">
-        <input class="opt" type="text" placeholder='Optional JSON (e.g. {"seconds":45} or {"loop":true,"maxSeconds":8})' value="${opt.replace(/"/g,'&quot;')}">
-        <button class="rm">Remove</button>
-      </div>
-    `;
-    li.querySelector(".rm").addEventListener("click", ()=> li.remove());
-
-    // DnD handlers
-    li.addEventListener("dragstart", e=>{
-      li.classList.add("dragging");
-      e.dataTransfer.effectAllowed = "move";
-    });
-    li.addEventListener("dragend", ()=> li.classList.remove("dragging"));
-    li.addEventListener("dragover", e=>{
-      e.preventDefault();
-      const dragging = listEl.querySelector(".dragging");
-      if(!dragging || dragging === li) return;
-      const rect = li.getBoundingClientRect();
-      const before = e.clientY < rect.top + rect.height / 2;
-      listEl.insertBefore(dragging, before ? li : li.nextSibling);
-    });
-    return li;
-  }
-
-  function parseLine(url, optStr){
-    const isVideo = /\.(mp4|webm)(\?.*)?$/i.test(url);
-    const it = { src: url, type: isVideo ? "video" : "image" };
-    if (optStr) {
-      try { Object.assign(it, JSON.parse(optStr)); } catch {}
-    }
+  /* ---------- Helper utils ---------- */
+  const clamp = (v,min,max)=>Math.max(min,Math.min(max,v));
+  function inferType(url){ return /\.(mp4|webm)(\?.*)?$/i.test(url) ? "video" : "image"; }
+  function parseItem(url, optStr){
+    const it = { src:url, type: inferType(url) };
+    if (optStr) { try { Object.assign(it, JSON.parse(optStr)); } catch {} }
     return it;
   }
-
-  function toModel(){
-    const items = [];
-    for(const li of listEl.querySelectorAll(".item")){
-      const url = li.querySelector(".u").value.trim();
-      if(!url) continue;
-      const opt = li.querySelector(".opt").value.trim();
-      items.push(parseLine(url, opt));
+  function itemToOptString(it){
+    const o = {};
+    if (it.type === "image" && it.seconds) o.seconds = it.seconds;
+    if (it.type === "video"){
+      if (typeof it.loop === "boolean") o.loop = it.loop;
+      if (it.maxSeconds) o.maxSeconds = it.maxSeconds;
     }
-    return items;
+    // visual overrides if present
+    if (it.fit && it.fit !== "inherit") o.fit = it.fit;
+    ["scale","rotDeg","txPct","tyPct"].forEach(k=>{
+      if (it[k] !== undefined && it[k] !== null && it[k] !== "") o[k] = it[k];
+    });
+    return Object.keys(o).length ? JSON.stringify(o) : "";
   }
-
-  function fromModel(items){
-    listEl.innerHTML = "";
-    for(const it of (items||[])){
-      const opts = {};
-      if(it.type === "video"){
-        if(it.loop) opts.loop = true;
-        if(it.maxSeconds) opts.maxSeconds = it.maxSeconds;
-      } else if(it.seconds){
-        opts.seconds = it.seconds;
-      }
-      const optStr = Object.keys(opts).length ? JSON.stringify(opts) : "";
-      listEl.appendChild(createItem(it.src, optStr));
-    }
+  function mergeOpts(global, it){
+    const o = {...global};
+    if (it.fit && it.fit !== "inherit") o.fit = it.fit;
+    ["scale","rotDeg","txPct","tyPct"].forEach(k=>{
+      if (it[k] !== undefined && it[k] !== null && it[k] !== "") o[k] = it[k];
+    });
+    return o;
   }
-
-  function importText(text){
-    const lines = (text||"").split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
-    const items = [];
-    for(const line of lines){
-      const m = line.match(/^(\S+)(?:\s+(\{.*\}))?$/);
-      if(!m) continue;
-      items.push(parseLine(m[1], m[2]||""));
-    }
-    fromModel(items);
-  }
-
-  function exportText(){
-    const items = toModel();
-    return items.map(it=>{
-      const opts = {};
-      if(it.type === "video"){
-        if(it.loop) opts.loop = true;
-        if(it.maxSeconds) opts.maxSeconds = it.maxSeconds;
-      } else if(it.seconds){
-        opts.seconds = it.seconds;
-      }
-      const o = Object.keys(opts).length ? " " + JSON.stringify(opts) : "";
-      return it.src + o;
-    }).join("\n");
-  }
-
-  /* ---------- Options form ---------- */
-  const els = {
-    interval: document.getElementById("interval"),
-    videoMax: document.getElementById("videoMax"),
-    fit:      document.getElementById("fit"),
-    bg:       document.getElementById("bg"),
-    shape:    document.getElementById("shape"),
-    pad:      document.getElementById("pad"),
-    padVal:   document.getElementById("padVal"),
-    ringW:    document.getElementById("ringW"),
-    ringC:    document.getElementById("ringC"),
-    scale:    document.getElementById("scale"),
-    scaleVal: document.getElementById("scaleVal"),
-    rot:      document.getElementById("rot"),
-    rotVal:   document.getElementById("rotVal"),
-    tx:       document.getElementById("tx"),
-    txVal:    document.getElementById("txVal"),
-    ty:       document.getElementById("ty"),
-    tyVal:    document.getElementById("tyVal"),
-  };
-  function readOpts(){
-    return {
-      interval: Math.max(1, parseInt(els.interval.value||"30",10)),
-      videoMax: Math.max(0, parseInt(els.videoMax.value||"0",10)),
-      fit: els.fit.value,
-      bg:  els.bg.value || "#000000",
-      shape: els.shape.value,
-      padPct: parseInt(els.pad.value,10),
-      ringW: parseInt(els.ringW.value||"0",10),
-      ringC: els.ringC.value || "#222222",
-      scale: Math.max(0.01, (parseInt(els.scale.value,10)||100) / 100),
-      rotDeg: parseInt(els.rot.value,10)||0,
-      txPct: parseInt(els.tx.value,10)||0,
-      tyPct: parseInt(els.ty.value,10)||0,
-    };
-  }
-  function writeOpts(o){
-    els.interval.value = o.interval ?? 30;
-    els.videoMax.value = o.videoMax ?? 0;
-    els.fit.value      = o.fit || "contain";
-    els.bg.value       = o.bg || "#000000";
-    els.shape.value    = o.shape || "circle";
-    els.pad.value      = o.padPct ?? 4;
-    els.ringW.value    = o.ringW ?? 0;
-    els.ringC.value    = o.ringC || "#222222";
-    els.scale.value    = Math.round((o.scale ?? 1) * 100);
-    els.rot.value      = o.rotDeg ?? 0;
-    els.tx.value       = o.txPct ?? 0;
-    els.ty.value       = o.tyPct ?? 0;
-    ["pad","scale","rot","tx","ty"].forEach(updateReadout);
-  }
-  function updateReadout(id){
-    if(typeof id !== "string"){ id = this.id; }
-    if(id==="pad") els.padVal.textContent = els.pad.value;
-    if(id==="scale") els.scaleVal.textContent = els.scale.value;
-    if(id==="rot") els.rotVal.textContent = els.rot.value;
-    if(id==="tx") els.txVal.textContent = els.tx.value;
-    if(id==="ty") els.tyVal.textContent = els.ty.value;
-  }
-  ["pad","scale","rot","tx","ty"].forEach(id=>document.getElementById(id).addEventListener("input", updateReadout));
-
-  /* ---------- Load/Save/Clear ---------- */
-  function saveToLocal(){
-    localStorage.setItem(K_PLAYLIST, JSON.stringify(toModel()));
-    localStorage.setItem(K_OPTIONS, JSON.stringify(readOpts()));
-    alert("Saved to this PC.");
-  }
-  function loadFromLocal(){
-    const items = JSON.parse(localStorage.getItem(K_PLAYLIST) || "[]");
-    const opts  = JSON.parse(localStorage.getItem(K_OPTIONS)  || "{}");
-    fromModel(items);
-    writeOpts(opts);
-    if(!items.length){
-      importText(`https://www.gstatic.com/webp/gallery/1.webp
-https://media.giphy.com/media/l0HlQ7LRal8X9sWzO/giphy.gif
-https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4 {"loop":false,"maxSeconds":6}`);
-    }
-  }
-  function clearAll(){
-    localStorage.removeItem(K_PLAYLIST);
-    localStorage.removeItem(K_OPTIONS);
-    fromModel([]); writeOpts({});
-    loadFromLocal();
-  }
-
-  /* ---------- Buttons ---------- */
-  document.getElementById("add").addEventListener("click", ()=> listEl.appendChild(createItem()));
-  document.getElementById("importTxt").addEventListener("click", ()=>{
-    const t = prompt("Paste lines: URL [space] optional JSON");
-    if(t!=null) importText(t);
-  });
-  document.getElementById("exportTxt").addEventListener("click", ()=>{
-    const t = exportText();
-    navigator.clipboard.writeText(t).catch(()=>{});
-    alert("Copied playlist text to clipboard.");
-  });
-  document.getElementById("save").addEventListener("click", saveToLocal);
-  document.getElementById("load").addEventListener("click", loadFromLocal);
-  document.getElementById("clear").addEventListener("click", clearAll);
-
-  /* ---------- Preview in Configure ---------- */
-  const previewBtn = document.getElementById("preview");
-  const backBtn = document.getElementById("back");
-  const previewPane = document.getElementById("previewPane");
-  const pStage = document.getElementById("previewStage");
-  const pImg = document.getElementById("pImg");
-  const pVid = document.getElementById("pVid");
-  let pTimer = null, pIdx = 0;
-
   function applyVisual(stageEl, imgEl, vidEl, o){
-    stageEl.style.setProperty('--bg', o.bg || "#000");
+    stageEl.style.setProperty('--bg',  o.bg || "#000");
     stageEl.style.setProperty('--pad', (o.padPct||0) + '%');
     stageEl.style.setProperty('--ringW', (o.ringW||0) + 'px');
     stageEl.style.setProperty('--ringC', o.ringC || '#222');
@@ -414,67 +306,346 @@ https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4 {"loop"
       el.style.setProperty('--ty',    (o.tyPct||0) + '%');
     });
   }
-  function clearP(){ if(pTimer){ clearTimeout(pTimer); pTimer=null; } }
 
-  function playPreview(items, o){
-    applyVisual(pStage, pImg, pVid, o);
-    if(!items.length) return;
-    function showImage(src, seconds){
-      clearP();
-      pVid.pause(); pVid.removeAttribute('src'); pVid.load(); pVid.classList.remove('show');
-      pImg.src = src; pImg.classList.add('show');
-      const s = Math.max(1, seconds || o.interval || 30);
-      pTimer = setTimeout(next, s*1000);
+  /* ============================================================
+     CONFIGURE MODE
+  ============================================================ */
+  if (!isKraken) {
+    const listEl = document.getElementById("list");
+    let selectedLi = null;
+
+    function createItem(url="", opt=""){
+      const li = document.createElement("li");
+      li.className = "item";
+      li.draggable = true;
+      li.innerHTML = `
+        <div class="grab" title="Drag to reorder">☰</div>
+        <input class="u" type="text" placeholder="https://example.com/image.webp or video.mp4" value="${url.replace(/"/g,'&quot;')}">
+        <div style="display:flex;gap:10px;align-items:center">
+          <input class="opt" type="text" placeholder='Optional JSON (e.g. {"seconds":45} or {"loop":true,"maxSeconds":8})' value="${opt.replace(/"/g,'&quot;')}">
+          <button class="edit">Edit</button>
+          <button class="prev">Preview</button>
+          <button class="rm">Remove</button>
+        </div>
+      `;
+
+      /* Remove */
+      li.querySelector(".rm").addEventListener("click", ()=>{
+        if (selectedLi === li) { clearInspector(); }
+        li.remove();
+      });
+
+      /* Edit (select) */
+      li.querySelector(".edit").addEventListener("click", ()=>{
+        selectLi(li);
+      });
+
+      /* Per-item Preview */
+      li.querySelector(".prev").addEventListener("click", ()=>{
+        const url = li.querySelector(".u").value.trim();
+        if (!url) return alert("Enter a URL first.");
+        const it = parseItem(url, li.querySelector(".opt").value.trim());
+        const opts = readGlobals(); // current unsaved globals
+        const payload = {
+          kind: "preview",
+          ts: Date.now(),
+          options: mergeOpts(opts, it),
+          item: it,
+          ttlMs: 120000
+        };
+        try { localStorage.setItem(K_PREVIEW, JSON.stringify(payload)); } catch {}
+        try { const bc = new BroadcastChannel("krakenChannel"); bc.postMessage({type:"preview",payload}); setTimeout(()=>bc.close(),300); } catch {}
+      });
+
+      /* Drag and drop */
+      li.addEventListener("dragstart", e=>{ li.classList.add("dragging"); e.dataTransfer.effectAllowed="move"; });
+      li.addEventListener("dragend",   ()=> li.classList.remove("dragging"));
+      li.addEventListener("dragover", e=>{
+        e.preventDefault();
+        const dragging = listEl.querySelector(".dragging");
+        if(!dragging || dragging === li) return;
+        const rect = li.getBoundingClientRect();
+        const before = e.clientY < rect.top + rect.height/2;
+        listEl.insertBefore(dragging, before ? li : li.nextSibling);
+      });
+
+      /* Selecting by clicking background (optional) */
+      li.addEventListener("click", (e)=>{
+        if (e.target.tagName === "INPUT" || e.target.tagName === "BUTTON") return;
+        selectLi(li);
+      });
+
+      return li;
     }
-    function showVideo(src, entry){
-      clearP();
-      pImg.classList.remove('show');
-      const loop = !!entry.loop;
-      const maxSeconds = o.videoMax || entry.maxSeconds || 0;
-      pVid.loop = loop && !maxSeconds;
-      pVid.muted = true;
-      pVid.controls = false;
-      pVid.autoplay = true;
-      pVid.src = src;
-      pVid.classList.add('show');
-      const p = pVid.play(); if(p && p.catch) p.catch(()=>setTimeout(()=>pVid.play().catch(()=>{}),250));
-      function advance(){ pVid.removeEventListener('ended', advance); next(); }
-      if(maxSeconds) pTimer = setTimeout(advance, Math.max(1,maxSeconds)*1000);
-      else if(!pVid.loop) pVid.addEventListener('ended', advance, { once:true });
-      else if(o.interval) pTimer = setTimeout(advance, Math.max(1,o.interval)*1000);
+
+    function toModel(){
+      const items = [];
+      for (const li of listEl.querySelectorAll(".item")){
+        const url = li.querySelector(".u").value.trim();
+        if (!url) continue;
+        const it = parseItem(url, li.querySelector(".opt").value.trim());
+        items.push(it);
+      }
+      return items;
     }
-    function render(){
-      const it = items[pIdx]; if(!it) return;
-      pImg.classList.remove('fade'); pVid.classList.remove('fade');
-      void pImg.offsetWidth; void pVid.offsetWidth;
-      pImg.classList.add('fade'); pVid.classList.add('fade');
-      if(it.type === 'video') showVideo(it.src, it);
-      else showImage(it.src, it.seconds);
+    function fromModel(items){
+      listEl.innerHTML = "";
+      items.forEach(it=>{
+        listEl.appendChild(createItem(it.src, itemToOptString(it)));
+      });
     }
-    function next(){ pIdx = (pIdx + 1) % items.length; render(); }
-    pIdx = 0; render();
+
+    /* Import/Export text */
+    function importText(text){
+      const lines=(text||"").split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
+      const items=[];
+      for(const line of lines){
+        const m = line.match(/^(\S+)(?:\s+(\{.*\}))?$/);
+        if(!m) continue;
+        items.push(parseItem(m[1], m[2]||""));
+      }
+      fromModel(items);
+    }
+    function exportText(){
+      return toModel().map(it=>{
+        const o = itemToOptString(it);
+        return it.src + (o ? " " + o : "");
+      }).join("\n");
+    }
+
+    /* Global options form */
+    const els = {
+      interval: document.getElementById("interval"),
+      videoMax: document.getElementById("videoMax"),
+      fit:      document.getElementById("fit"),
+      bg:       document.getElementById("bg"),
+      shape:    document.getElementById("shape"),
+      pad:      document.getElementById("pad"),
+      padVal:   document.getElementById("padVal"),
+      ringW:    document.getElementById("ringW"),
+      ringC:    document.getElementById("ringC"),
+      scale:    document.getElementById("scale"),
+      scaleVal: document.getElementById("scaleVal"),
+      rot:      document.getElementById("rot"),
+      rotVal:   document.getElementById("rotVal"),
+      tx:       document.getElementById("tx"),
+      txVal:    document.getElementById("txVal"),
+      ty:       document.getElementById("ty"),
+      tyVal:    document.getElementById("tyVal"),
+    };
+    ["pad","scale","rot","tx","ty"].forEach(id=>{
+      document.getElementById(id).addEventListener("input", ()=>{
+        if(id==="pad") els.padVal.textContent = els.pad.value;
+        if(id==="scale") els.scaleVal.textContent = els.scale.value;
+        if(id==="rot") els.rotVal.textContent = els.rot.value;
+        if(id==="tx") els.txVal.textContent = els.tx.value;
+        if(id==="ty") els.tyVal.textContent = els.ty.value;
+      });
+    });
+
+    function readGlobals(){
+      return {
+        interval: Math.max(1, parseInt(els.interval.value||"30",10)),
+        videoMax: Math.max(0, parseInt(els.videoMax.value||"0",10)),
+        fit: els.fit.value,
+        bg:  els.bg.value || "#000000",
+        shape: els.shape.value,
+        padPct: parseInt(els.pad.value,10),
+        ringW: parseInt(els.ringW.value||"0",10),
+        ringC: els.ringC.value || "#222222",
+        scale: Math.max(0.01, (parseInt(els.scale.value,10)||100) / 100),
+        rotDeg: parseInt(els.rot.value,10)||0,
+        txPct: parseInt(els.tx.value,10)||0,
+        tyPct: parseInt(els.ty.value,10)||0,
+      };
+    }
+    function writeGlobals(o){
+      els.interval.value = o.interval ?? 30;
+      els.videoMax.value = o.videoMax ?? 0;
+      els.fit.value      = o.fit || "contain";
+      els.bg.value       = o.bg || "#000000";
+      els.shape.value    = o.shape || "circle";
+      els.pad.value      = o.padPct ?? 4; els.padVal.textContent = els.pad.value;
+      els.ringW.value    = o.ringW ?? 0;
+      els.ringC.value    = o.ringC || "#222222";
+      els.scale.value    = Math.round((o.scale ?? 1) * 100); els.scaleVal.textContent = els.scale.value;
+      els.rot.value      = o.rotDeg ?? 0; els.rotVal.textContent = els.rot.value;
+      els.tx.value       = o.txPct ?? 0;  els.txVal.textContent = els.tx.value;
+      els.ty.value       = o.tyPct ?? 0;  els.tyVal.textContent = els.ty.value;
+    }
+
+    /* Persistence */
+    function saveToLocal(){
+      localStorage.setItem(K_PLAYLIST, JSON.stringify(toModel()));
+      localStorage.setItem(K_OPTIONS, JSON.stringify(readGlobals()));
+      alert("Saved to this PC.");
+    }
+    function loadFromLocal(){
+      const items = JSON.parse(localStorage.getItem(K_PLAYLIST) || "[]");
+      const opts  = JSON.parse(localStorage.getItem(K_OPTIONS)  || "{}");
+      fromModel(items);
+      writeGlobals(opts);
+      if(!items.length){
+        importText(`https://www.gstatic.com/webp/gallery/1.webp
+https://media.giphy.com/media/l0HlQ7LRal8X9sWzO/giphy.gif
+https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4 {"loop":false,"maxSeconds":6}`);
+      }
+    }
+    function clearAll(){
+      localStorage.removeItem(K_PLAYLIST);
+      localStorage.removeItem(K_OPTIONS);
+      fromModel([]); writeGlobals({});
+      loadFromLocal();
+    }
+
+    /* Buttons */
+    document.getElementById("add").addEventListener("click", ()=> listEl.appendChild(createItem()));
+    document.getElementById("importTxt").addEventListener("click", ()=>{
+      const t = prompt("Paste lines: URL [space] optional JSON");
+      if(t!=null) importText(t);
+    });
+    document.getElementById("exportTxt").addEventListener("click", ()=>{
+      const t = exportText();
+      navigator.clipboard.writeText(t).catch(()=>{});
+      alert("Copied playlist text to clipboard.");
+    });
+    document.getElementById("save").addEventListener("click", saveToLocal);
+    document.getElementById("load").addEventListener("click", loadFromLocal);
+    document.getElementById("clear").addEventListener("click", clearAll);
+
+    /* --------- Per-item Inspector --------- */
+    const ins = {
+      root: document.getElementById("inspector"),
+      type: document.getElementById("insType"),
+      url:  document.getElementById("insUrl"),
+      apply: document.getElementById("applyItem"),
+      preview: document.getElementById("previewItem"),
+      clear: document.getElementById("clearItem"),
+      seconds: document.getElementById("i_seconds"),
+      loop:    document.getElementById("i_loop"),
+      maxSeconds: document.getElementById("i_maxSeconds"),
+      fit:     document.getElementById("i_fit"),
+      scale:   document.getElementById("i_scale"),
+      rotDeg:  document.getElementById("i_rotDeg"),
+      txPct:   document.getElementById("i_txPct"),
+      tyPct:   document.getElementById("i_tyPct"),
+    };
+
+    function clearInspector(){
+      if (selectedLi) selectedLi.classList.remove("selected");
+      selectedLi = null;
+      ins.root.style.display = "none";
+    }
+
+    function loadInspectorFromLi(li){
+      const url = li.querySelector(".u").value.trim();
+      const raw = li.querySelector(".opt").value.trim();
+      const it  = parseItem(url, raw);
+      ins.type.textContent = (it.type || inferType(url)).toUpperCase();
+      ins.url.textContent = url || "(no url)";
+      // populate fields (blank = inherit)
+      ins.seconds.value   = it.type==="image" ? (it.seconds||0) : 0;
+      ins.loop.value      = (typeof it.loop === "boolean") ? String(it.loop) : "inherit";
+      ins.maxSeconds.value= it.maxSeconds || 0;
+      ins.fit.value       = it.fit ? it.fit : "inherit";
+      ins.scale.value     = (it.scale!=null) ? Math.round(it.scale*100) : "";
+      ins.rotDeg.value    = (it.rotDeg!=null) ? it.rotDeg : "";
+      ins.txPct.value     = (it.txPct!=null) ? it.txPct : "";
+      ins.tyPct.value     = (it.tyPct!=null) ? it.tyPct : "";
+    }
+
+    function writeLiFromInspector(li){
+      const url = li.querySelector(".u").value.trim();
+      if (!url) return alert("URL is required for this item.");
+      const type = inferType(url);
+      const it = parseItem(url, li.querySelector(".opt").value.trim()); // start with existing
+      it.type = type;
+
+      // seconds for images
+      const seconds = parseInt(ins.seconds.value||"0",10);
+      if (type==="image"){
+        if (seconds>0) it.seconds = seconds; else delete it.seconds;
+      } else {
+        delete it.seconds;
+      }
+
+      // video loop/maxSeconds
+      if (type==="video"){
+        const ms = parseInt(ins.maxSeconds.value||"0",10);
+        if (ms>0) it.maxSeconds = ms; else delete it.maxSeconds;
+        if (ins.loop.value==="true") it.loop = true;
+        else if (ins.loop.value==="false") it.loop = false;
+        else delete it.loop;
+      } else {
+        delete it.loop; delete it.maxSeconds;
+      }
+
+      // visual overrides
+      const fit = ins.fit.value;
+      if (fit==="contain" || fit==="cover") it.fit = fit; else delete it.fit;
+
+      const s = ins.scale.value.trim();
+      if (s!==""){ it.scale = clamp(parseInt(s,10)/100, 0.01, 5); } else delete it.scale;
+
+      ["rotDeg","txPct","tyPct"].forEach(k=>{
+        const v = ins[k].value.trim();
+        if (v!=="") it[k] = parseInt(v,10); else delete it[k];
+      });
+
+      // write back to the JSON input for transparency
+      li.querySelector(".opt").value = itemToOptString(it);
+    }
+
+    function selectLi(li){
+      if (selectedLi) selectedLi.classList.remove("selected");
+      selectedLi = li;
+      li.classList.add("selected");
+      ins.root.style.display = "block";
+      loadInspectorFromLi(li);
+    }
+
+    ins.apply.addEventListener("click", ()=>{
+      if (!selectedLi) return;
+      writeLiFromInspector(selectedLi);
+      loadInspectorFromLi(selectedLi); // reflect normalization
+    });
+
+    ins.clear.addEventListener("click", ()=>{
+      if (!selectedLi) return;
+      // wipe overrides by emptying opt JSON
+      selectedLi.querySelector(".opt").value = "";
+      loadInspectorFromLi(selectedLi);
+    });
+
+    ins.preview.addEventListener("click", ()=>{
+      if (!selectedLi) return;
+      // apply current inspector into item (without forcing Save) and send preview
+      writeLiFromInspector(selectedLi);
+      const url = selectedLi.querySelector(".u").value.trim();
+      if (!url) return alert("URL is required.");
+      const it = parseItem(url, selectedLi.querySelector(".opt").value.trim());
+      const opts = readGlobals();
+      const payload = { kind:"preview", ts:Date.now(), options: mergeOpts(opts, it), item: it, ttlMs: 120000 };
+      try { localStorage.setItem(K_PREVIEW, JSON.stringify(payload)); } catch {}
+      try { const bc = new BroadcastChannel("krakenChannel"); bc.postMessage({type:"preview",payload}); setTimeout(()=>bc.close(),300); } catch {}
+    });
+
+    /* Init */
+    document.getElementById("config").style.display = "block";
+    loadFromLocal();
   }
 
-  previewBtn.addEventListener("click", ()=>{
-    previewPane.style.display = "block";
-    backBtn.style.display = "inline-block";
-    // Use unsaved form values for live preview
-    playPreview(toModel(), readOpts());
-  });
-  backBtn.addEventListener("click", ()=>{
-    previewPane.style.display = "none";
-    backBtn.style.display = "none";
-    clearP();
-  });
-
-  /* ---------- Device playback (kraken=1) ---------- */
-  if(isKraken){
+  /* ============================================================
+     DEVICE MODE (kraken=1)
+  ============================================================ */
+  if (isKraken) {
     const stage = document.getElementById("player");
     const imgEl = document.getElementById("imgEl");
     const vidEl = document.getElementById("vidEl");
+    stage.style.display = "flex";
 
-    const items = JSON.parse(localStorage.getItem(K_PLAYLIST) || "[]");
-    const o = Object.assign(
+    let items = JSON.parse(localStorage.getItem(K_PLAYLIST) || "[]");
+    let o = Object.assign(
       { interval:30, videoMax:0, fit:"contain", bg:"#000000", shape:"circle", padPct:4, ringW:0, ringC:"#222",
         scale:1, rotDeg:0, txPct:0, tyPct:0 },
       JSON.parse(localStorage.getItem(K_OPTIONS) || "{}")
@@ -489,26 +660,25 @@ https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4 {"loop"
       location.reload();
     }
 
-    stage.style.display = "flex";
-    applyVisual(stage, imgEl, vidEl, o);
-
-    let idx=0, timer=null;
+    let idx=0, timer=null, previewActive=false, lastPreviewTs=0;
     const clearTimer=()=>{ if(timer){ clearTimeout(timer); timer=null; } };
 
-    function showImage(src, seconds){
+    function showImage(src, seconds, opts){
       clearTimer();
+      applyVisual(stage, imgEl, vidEl, opts || o);
       vidEl.pause(); vidEl.removeAttribute('src'); vidEl.load(); vidEl.classList.remove('show');
       imgEl.src = src; imgEl.classList.add('show');
-      const s = Math.max(1, seconds || o.interval || 30);
+      const s = Math.max(1, seconds || (opts?.interval ?? o.interval) || 30);
       timer = setTimeout(next, s*1000);
     }
-    function showVideo(src, entry){
+    function showVideo(src, entry, opts){
       clearTimer();
+      applyVisual(stage, imgEl, vidEl, opts || o);
       imgEl.classList.remove('show');
-      const loop = !!entry.loop;
-      const maxSeconds = o.videoMax || entry.maxSeconds || 0;
+      const maxSeconds = (opts?.videoMax || 0) || entry.maxSeconds || 0;
+      const loop = (entry.loop===true) && !maxSeconds;
 
-      vidEl.loop = loop && !maxSeconds;
+      vidEl.loop = loop;
       vidEl.muted = true;
       vidEl.controls = false;
       vidEl.autoplay = true;
@@ -519,23 +689,80 @@ https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4 {"loop"
       function advance(){ vidEl.removeEventListener('ended', advance); next(); }
       if(maxSeconds) timer = setTimeout(advance, Math.max(1,maxSeconds)*1000);
       else if(!vidEl.loop) vidEl.addEventListener('ended', advance, { once:true });
-      else if(o.interval) timer = setTimeout(advance, Math.max(1,o.interval)*1000);
+      else if(opts?.interval || o.interval) timer = setTimeout(advance, Math.max(1,(opts?.interval||o.interval))*1000);
     }
 
     function render(){
       const it = items[idx]; if(!it) return;
+      const eff = mergeOpts(o, it); // per-item visual overrides
       imgEl.classList.remove('fade'); vidEl.classList.remove('fade');
       void imgEl.offsetWidth; void vidEl.offsetWidth;
       imgEl.classList.add('fade'); vidEl.classList.add('fade');
-      if(it.type === 'video') showVideo(it.src, it);
-      else showImage(it.src, it.seconds);
+      if(it.type === 'video') showVideo(it.src, it, eff);
+      else showImage(it.src, it.seconds, eff);
     }
-    function next(){ idx = (idx+1) % items.length; render(); }
+    function next(){
+      if (previewActive) {
+        previewActive = false;
+        // re-sync globals/playlist after preview
+        o = Object.assign(
+          { interval:30, videoMax:0, fit:"contain", bg:"#000000", shape:"circle", padPct:4, ringW:0, ringC:"#222",
+            scale:1, rotDeg:0, txPct:0, tyPct:0 },
+          JSON.parse(localStorage.getItem(K_OPTIONS) || "{}")
+        );
+        items = JSON.parse(localStorage.getItem(K_PLAYLIST) || "[]") || items;
+      } else {
+        idx = (idx + 1) % items.length;
+      }
+      render();
+    }
+
     render();
-  } else {
-    // Configure mode startup
-    document.getElementById("config").style.display = "block";
-    loadFromLocal();
+
+    function tryActivatePreview(raw){
+      if (!raw) return;
+      let payload; try { payload = JSON.parse(raw); } catch { return; }
+      if (!payload || payload.kind !== "preview") return;
+      if (payload.ts <= lastPreviewTs) return;
+      if (payload.ttlMs && (Date.now() - payload.ts > payload.ttlMs)) return;
+
+      lastPreviewTs = payload.ts;
+      previewActive = true;
+      clearTimer();
+
+      const it = payload.item;
+      const opts = payload.options || o;
+      imgEl.classList.remove('fade'); vidEl.classList.remove('fade');
+      void imgEl.offsetWidth; void vidEl.offsetWidth;
+      imgEl.classList.add('fade'); vidEl.classList.add('fade');
+
+      if (inferType(it.src) === "video") showVideo(it.src, it, opts);
+      else showImage(it.src, it.seconds, opts);
+    }
+
+    window.addEventListener("storage", (e)=>{
+      if (e.key === K_PREVIEW && e.newValue) tryActivatePreview(e.newValue);
+      if (!previewActive && e.key === K_OPTIONS) {
+        o = Object.assign(
+          { interval:30, videoMax:0, fit:"contain", bg:"#000000", shape:"circle", padPct:4, ringW:0, ringC:"#222",
+            scale:1, rotDeg:0, txPct:0, tyPct:0 },
+          JSON.parse(localStorage.getItem(K_OPTIONS) || "{}")
+        );
+      }
+      if (!previewActive && e.key === K_PLAYLIST) {
+        items = JSON.parse(localStorage.getItem(K_PLAYLIST) || "[]") || items;
+      }
+    });
+
+    try {
+      const bc = new BroadcastChannel("krakenChannel");
+      bc.onmessage = (ev)=>{
+        if (ev?.data?.type === "preview" && ev.data.payload) {
+          tryActivatePreview(JSON.stringify(ev.data.payload));
+        }
+      };
+    } catch {}
+    tryActivatePreview(localStorage.getItem(K_PREVIEW));
   }
 </script>
 </body>
