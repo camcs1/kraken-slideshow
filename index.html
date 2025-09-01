@@ -385,8 +385,8 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
         selectLi(li);
       });
 
+      urlInput.addEventListener("input", refreshPreview);
       urlInput.addEventListener("change", ()=>{
-        refreshPreview();
         if (li === selectedLi){ loadInspectorFromLi(li); if(editMode) maybePreviewSelected(); }
       });
       li.querySelector(".opt").addEventListener("change", ()=>{
