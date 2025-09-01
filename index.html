@@ -158,6 +158,15 @@
           <option value="cover">cover</option>
         </select>
       </div>
+      <div>
+        <label>Show at time (HH:MM)</label>
+        <input id="i_at" type="time" step="60" value="">
+        <div class="muted">24h format; optional.</div>
+      </div>
+      <div style="grid-column:1/-1;display:flex;align-items:center;margin-top:4px">
+        <input id="i_atOnly" type="checkbox">
+        <label for="i_atOnly" style="margin:0; font-weight:600">Only at scheduled time</label>
+      </div>
       <div style="grid-column:1/-1;display:flex;align-items:center;margin-top:4px">
         <input id="i_playOnce" type="checkbox">
         <label for="i_playOnce" style="margin:0; font-weight:600">Play once</label>
@@ -292,6 +301,8 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
       if (it.maxSeconds) o.maxSeconds = it.maxSeconds;
     }
     if (it.fit && it.fit !== "inherit") o.fit = it.fit;
+    if (it.at) o.at = it.at;
+    if (it.only) o.only = true;
     ["scale","rotDeg","txPct","tyPct"].forEach(k=>{
       if (it[k] !== undefined && it[k] !== null && it[k] !== "") o[k] = it[k];
     });
@@ -559,6 +570,8 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
       loop:    document.getElementById("i_loop"),
       maxSeconds: document.getElementById("i_maxSeconds"),
       fit:     document.getElementById("i_fit"),
+      at:      document.getElementById("i_at"),
+      atOnly:  document.getElementById("i_atOnly"),
       playOnce:document.getElementById("i_playOnce"),
       scale:   document.getElementById("i_scale"),
       rotDeg:  document.getElementById("i_rotDeg"),
@@ -582,6 +595,8 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
       ins.loop.value      = (typeof it.loop === "boolean") ? String(it.loop) : "inherit";
       ins.maxSeconds.value= it.maxSeconds || 0;
       ins.fit.value       = it.fit ? it.fit : "inherit";
+      ins.at.value        = it.at || "";
+      ins.atOnly.checked  = !!it.only;
       ins.playOnce.checked= !!it.playOnce;
       ins.scale.value     = (it.scale!=null) ? Math.round(it.scale*100) : "";
       ins.rotDeg.value    = (it.rotDeg!=null) ? it.rotDeg : "";
@@ -613,6 +628,10 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
 
       const fit = ins.fit.value;
       if (fit==="contain" || fit==="cover") it.fit = fit; else delete it.fit;
+
+      const at = ins.at.value.trim();
+      if (at) it.at = at; else delete it.at;
+      if (ins.atOnly.checked) it.only = true; else delete it.only;
 
       const s = ins.scale.value.trim();
       if (s!==""){ it.scale = clamp(parseInt(s,10)/100, 0.01, 5); } else delete it.scale;
@@ -711,6 +730,28 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
     let editMode=false;        // if true, freeze slideshow timers
     let lastMsgTs=0;
 
+    function resetIndex(){
+      const i = items.findIndex(it => !(it.at && it.only));
+      idx = i === -1 ? 0 : i;
+    }
+    resetIndex();
+
+    const scheduleShown = {};
+    function checkSchedule(){
+      if(editMode) return;
+      const now = new Date();
+      const time = now.toTimeString().slice(0,5);
+      const day = now.toDateString();
+      if (scheduleShown[time] === day) return;
+      const found = items.findIndex(it => (it.at && it.at.padStart(5,'0') === time));
+      if (found !== -1){
+        scheduleShown[time] = day;
+        idx = found;
+        render();
+      }
+    }
+    setInterval(checkSchedule, 1000);
+
     const clearTimer=()=>{ if(timer){ clearTimeout(timer); timer=null; } };
 
     function showImage(src, seconds, entry, opts, advance=true){
@@ -772,11 +813,20 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
       else showImage(it.src, it.seconds, it, eff);
     }
     function next(){
-      idx = (idx + 1) % items.length;
-      render();
+        if (!items.length) return;
+        let start = idx;
+        do {
+          idx = (idx + 1) % items.length;
+          if (!(items[idx].at && items[idx].only)) {
+            render();
+            return;
+          }
+        } while (idx !== start);
+        imgEl.classList.remove('show');
+        vidEl.classList.remove('show');
     }
 
-    render();
+    if (!(items[idx] && items[idx].at && items[idx].only)) render();
 
     /* ---- Respond to edit-mode messages ---- */
     function handleEditMessage(msg){
@@ -816,8 +866,9 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
           JSON.parse(localStorage.getItem(K_OPTIONS) || "{}")
         );
         items = JSON.parse(localStorage.getItem(K_PLAYLIST) || "[]") || items;
+        resetIndex();
         clearTimer();
-        render();
+        if (!(items[idx] && items[idx].at && items[idx].only)) render();
       }
     }
 
@@ -832,9 +883,10 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
           JSON.parse(localStorage.getItem(K_OPTIONS) || "{}")
         );
       }
-      if (!editMode && e.key === K_PLAYLIST) {
-        items = JSON.parse(localStorage.getItem(K_PLAYLIST) || "[]") || items;
-      }
+        if (!editMode && e.key === K_PLAYLIST) {
+          items = JSON.parse(localStorage.getItem(K_PLAYLIST) || "[]") || items;
+          resetIndex();
+        }
     });
 
     try {

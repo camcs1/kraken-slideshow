@@ -8,9 +8,10 @@ It supports images (`png`, `jpg`, `gif`, `webp`) and video (`mp4`, `webm`) with 
 ## Features
 - **Configure button support**: When you click **Configure** in CAM, a configuration UI opens.
 - **Drag-and-drop playlist editor**: Add, remove, and reorder media URLs with simple handles.
-- **Per-item options**: Add JSON options for each item, e.g.  
-  - Images: `{ "seconds": 45 }` for custom duration  
-  - Videos: `{ "loop": true, "maxSeconds": 8 }`
+- **Per-item options**: Add JSON options for each item, e.g.
+    - Images: `{ "seconds": 45 }` for custom duration
+    - Videos: `{ "loop": true, "maxSeconds": 8 }`
+    - Scheduled: `{ "at": "16:20" }` to show at 4:20 PM daily (add `{ "only": true }` to hide from normal rotation)
 - **Global options**:
   - Image interval and video max length
   - Object fit: `contain` or `cover`
@@ -65,6 +66,7 @@ It supports images (`png`, `jpg`, `gif`, `webp`) and video (`mp4`, `webm`) with 
 [https://media.giphy.com/media/l0HlQ7LRal8X9sWzO/giphy.gif](https://media.giphy.com/media/l0HlQ7LRal8X9sWzO/giphy.gif)
 [https://example.com/clip.mp4](https://example.com/clip.mp4) {"loop"\:true,"maxSeconds":10}
 [https://example.com/image2.jpg](https://example.com/image2.jpg) {"seconds":60}
+  [https://example.com/snoop.jpg](https://example.com/snoop.jpg) {"at":"16:20","only":true}
 
 ```
 
