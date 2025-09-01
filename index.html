@@ -54,11 +54,12 @@
   /* Playlist list */
   .list{list-style:none;margin:0;padding:0}
   .item{
-    display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;
+    display:grid;grid-template-columns:auto auto 1fr auto;gap:10px;align-items:center;
     background:#0f0f0f;border:1px solid #272727;border-radius:10px;padding:10px;margin:8px 0;
   }
   .grab{cursor:grab;user-select:none;font-weight:700;padding:6px 8px;background:#1b1b1b;border-radius:8px}
   .dragging{opacity:.6}
+  .preview{width:60px;height:60px;object-fit:cover;display:none;border-radius:6px}
   .u{width:100%}
   .opt{width:280px}
   .rm{background:#ef4444}
@@ -335,6 +336,7 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
       li.draggable = true;
       li.innerHTML = `
         <div class="grab" title="Drag to reorder">☰</div>
+        <img class="preview" loading="lazy" alt="">
         <input class="u" type="text" placeholder="https://example.com/image.webp or video.mp4" value="${url.replace(/"/g,'&quot;')}">
         <div style="display:flex;gap:10px;align-items:center">
           <input class="opt" type="text" placeholder='Optional JSON (e.g. {"seconds":45,"playOnce":true})' value="${opt.replace(/"/g,'&quot;')}">
@@ -342,6 +344,21 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
           <button class="rm">Remove</button>
         </div>
       `;
+
+      const urlInput = li.querySelector(".u");
+      const preview = li.querySelector(".preview");
+
+      function refreshPreview(){
+        const u = urlInput.value.trim();
+        if (/\.gif(\?.*)?$/i.test(u)){
+          preview.src = u;
+          preview.style.display = "block";
+        } else {
+          preview.removeAttribute('src');
+          preview.style.display = "none";
+        }
+      }
+      refreshPreview();
 
       li.querySelector(".rm").addEventListener("click", ()=>{
         const wasSelected = (selectedLi === li);
@@ -368,7 +385,8 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
         selectLi(li);
       });
 
-      li.querySelector(".u").addEventListener("change", ()=>{
+      urlInput.addEventListener("change", ()=>{
+        refreshPreview();
         if (li === selectedLi){ loadInspectorFromLi(li); if(editMode) maybePreviewSelected(); }
       });
       li.querySelector(".opt").addEventListener("change", ()=>{
