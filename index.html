@@ -59,7 +59,10 @@
   }
   .grab{cursor:grab;user-select:none;font-weight:700;padding:6px 8px;background:#1b1b1b;border-radius:8px}
   .dragging{opacity:.6}
+  .preview{width:60px;height:60px;object-fit:cover;display:none;border-radius:6px}
+=======
   .preview{width:60px;height:40px;object-fit:cover;display:none;border-radius:6px}
+
   .u{width:100%}
   .opt{width:280px}
   .rm{background:#ef4444}
@@ -396,6 +399,10 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
         selectLi(li);
       });
 
+
+      urlInput.addEventListener("input", refreshPreview);
+      urlInput.addEventListener("change", ()=>{
+=======
       urlInput.addEventListener("change", ()=>{
         refreshPreview();
         if (li === selectedLi){ loadInspectorFromLi(li); if(editMode) maybePreviewSelected(); }
