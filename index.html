@@ -84,6 +84,17 @@
   /* Inspector */
   .inspector-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
   .badge{display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border-radius:999px;background:#1f2937;font-size:.85rem}
+  .segmented{display:flex;gap:8px;flex-wrap:wrap}
+  .segmented .segBtn{flex:1 1 0;padding:10px 12px;background:#222;color:#eaeaea;border:1px solid #333}
+  .segmented .segBtn.active{background:#6d5ef9;border-color:#6d5ef9;color:#fff}
+  .sliderHead{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:8px 0 6px}
+  .sliderHead label{margin:0}
+  .overrideToggle{display:flex;align-items:center;gap:8px;font-weight:600;color:#ddd;white-space:nowrap}
+  .overrideToggle input{margin:0}
+  .sliderLine{display:grid;grid-template-columns:1fr 92px auto;gap:10px;align-items:center}
+  .sliderLine input[type="number"]{width:92px}
+  input[type="range"]{width:100%}
+  input[type="range"]:disabled{opacity:.35}
 
   /* ===== Modal Import ===== */
   .modalOverlay{
@@ -156,11 +167,12 @@
       </div>
       <div>
         <label>Video: loop</label>
-        <select id="i_loop">
-          <option value="inherit">inherit</option>
-          <option value="true">true</option>
-          <option value="false">false</option>
-        </select>
+        <input id="i_loop" type="hidden" value="inherit">
+        <div class="segmented" data-bound="i_loop">
+          <button type="button" class="segBtn" data-value="inherit">Inherit</button>
+          <button type="button" class="segBtn" data-value="true">Loop</button>
+          <button type="button" class="segBtn" data-value="false">No loop</button>
+        </div>
       </div>
       <div>
         <label>Video: max seconds (0 = no cap)</label>
@@ -168,11 +180,12 @@
       </div>
       <div>
         <label>Override fit</label>
-        <select id="i_fit">
-          <option value="inherit">inherit</option>
-          <option value="contain">contain</option>
-          <option value="cover">cover</option>
-        </select>
+        <input id="i_fit" type="hidden" value="inherit">
+        <div class="segmented" data-bound="i_fit">
+          <button type="button" class="segBtn" data-value="inherit">Inherit</button>
+          <button type="button" class="segBtn" data-value="contain">Contain</button>
+          <button type="button" class="segBtn" data-value="cover">Cover</button>
+        </div>
       </div>
       <div>
         <label>Show at time (HH:MM)</label>
@@ -187,21 +200,49 @@
 
     <div class="inspector-grid" style="margin-top:12px">
       <div>
-        <label>Override zoom (%)</label>
-        <input id="i_scale" type="number" min="10" max="500" value="">
-        <div class="muted">Blank = inherit global.</div>
+        <div class="sliderHead">
+          <label>Zoom</label>
+          <span class="overrideToggle"><input id="i_scale_enabled" type="checkbox"> Override</span>
+        </div>
+        <div class="sliderLine">
+          <input id="i_scale" type="range" min="10" max="500" value="100">
+          <input id="i_scale_num" type="number" min="10" max="500" step="1" value="100">
+          <span>%</span>
+        </div>
+        <div class="muted">Off = inherit global zoom.</div>
       </div>
       <div>
-        <label>Override rotation (deg)</label>
-        <input id="i_rotDeg" type="number" min="-180" max="180" value="">
+        <div class="sliderHead">
+          <label>Rotation</label>
+          <span class="overrideToggle"><input id="i_rotDeg_enabled" type="checkbox"> Override</span>
+        </div>
+        <div class="sliderLine">
+          <input id="i_rotDeg" type="range" min="-180" max="180" value="0">
+          <input id="i_rotDeg_num" type="number" min="-180" max="180" step="1" value="0">
+          <span>°</span>
+        </div>
       </div>
       <div>
-        <label>Override offset X (%)</label>
-        <input id="i_txPct" type="number" min="-100" max="100" value="">
+        <div class="sliderHead">
+          <label>Offset X</label>
+          <span class="overrideToggle"><input id="i_txPct_enabled" type="checkbox"> Override</span>
+        </div>
+        <div class="sliderLine">
+          <input id="i_txPct" type="range" min="-100" max="100" value="0">
+          <input id="i_txPct_num" type="number" min="-100" max="100" step="1" value="0">
+          <span>%</span>
+        </div>
       </div>
       <div>
-        <label>Override offset Y (%)</label>
-        <input id="i_tyPct" type="number" min="-100" max="100" value="">
+        <div class="sliderHead">
+          <label>Offset Y</label>
+          <span class="overrideToggle"><input id="i_tyPct_enabled" type="checkbox"> Override</span>
+        </div>
+        <div class="sliderLine">
+          <input id="i_tyPct" type="range" min="-100" max="100" value="0">
+          <input id="i_tyPct_num" type="number" min="-100" max="100" step="1" value="0">
+          <span>%</span>
+        </div>
       </div>
     </div>
 
@@ -590,10 +631,65 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
       at:      document.getElementById("i_at"),
       atOnly:  document.getElementById("i_atOnly"),
       scale:   document.getElementById("i_scale"),
+      scaleEnabled: document.getElementById("i_scale_enabled"),
+      scaleNum: document.getElementById("i_scale_num"),
       rotDeg:  document.getElementById("i_rotDeg"),
+      rotDegEnabled: document.getElementById("i_rotDeg_enabled"),
+      rotDegNum: document.getElementById("i_rotDeg_num"),
       txPct:   document.getElementById("i_txPct"),
+      txPctEnabled: document.getElementById("i_txPct_enabled"),
+      txPctNum: document.getElementById("i_txPct_num"),
       tyPct:   document.getElementById("i_tyPct"),
+      tyPctEnabled: document.getElementById("i_tyPct_enabled"),
+      tyPctNum: document.getElementById("i_tyPct_num"),
     };
+
+    function setSegmentedValue(id, value){
+      const input = document.getElementById(id);
+      if (!input) return;
+      input.value = value;
+      document.querySelectorAll(`.segmented[data-bound="${id}"] .segBtn`).forEach(btn=>{
+        btn.classList.toggle("active", btn.dataset.value === value);
+      });
+    }
+
+    document.querySelectorAll(".segmented .segBtn").forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        const group = btn.closest(".segmented");
+        setSegmentedValue(group.dataset.bound, btn.dataset.value);
+        commitInspectorLive();
+      });
+    });
+
+    const sliderControls = ["scale","rotDeg","txPct","tyPct"];
+    function clampControlValue(input, value){
+      const min = input.min === "" ? -Infinity : parseFloat(input.min);
+      const max = input.max === "" ? Infinity : parseFloat(input.max);
+      const fallback = input.value || input.defaultValue || "0";
+      const parsed = Number.isFinite(parseFloat(value)) ? parseFloat(value) : parseFloat(fallback);
+      return String(Math.round(clamp(parsed, min, max)));
+    }
+    function setOverrideSlider(name, enabled, value){
+      const input = ins[name];
+      const number = ins[name + "Num"];
+      const toggle = ins[name + "Enabled"];
+      if (!input || !number || !toggle) return;
+      toggle.checked = !!enabled;
+      input.disabled = !toggle.checked;
+      number.disabled = !toggle.checked;
+      if (value !== undefined && value !== null && value !== "") input.value = clampControlValue(input, value);
+      number.value = input.value;
+    }
+    function syncOverrideSlider(name, source){
+      const input = ins[name];
+      const number = ins[name + "Num"];
+      const toggle = ins[name + "Enabled"];
+      if (!input || !number || !toggle) return;
+      input.disabled = !toggle.checked;
+      number.disabled = !toggle.checked;
+      if (source === "number") input.value = clampControlValue(input, number.value);
+      else number.value = input.value;
+    }
 
     function clearInspector(){
       if (selectedLi) selectedLi.classList.remove("selected");
@@ -608,15 +704,15 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
       ins.type.textContent = (it.type || inferType(url)).toUpperCase();
       ins.url.textContent = url || "(no url)";
       ins.seconds.value   = it.type==="image" ? (it.seconds||0) : 0;
-      ins.loop.value      = (typeof it.loop === "boolean") ? String(it.loop) : "inherit";
+      setSegmentedValue("i_loop", (typeof it.loop === "boolean") ? String(it.loop) : "inherit");
       ins.maxSeconds.value= it.maxSeconds || 0;
-      ins.fit.value       = it.fit ? it.fit : "inherit";
+      setSegmentedValue("i_fit", it.fit ? it.fit : "inherit");
       ins.at.value        = it.at || "";
       ins.atOnly.checked  = !!it.only;
-      ins.scale.value     = (it.scale!=null) ? Math.round(it.scale*100) : "";
-      ins.rotDeg.value    = (it.rotDeg!=null) ? it.rotDeg : "";
-      ins.txPct.value     = (it.txPct!=null) ? it.txPct : "";
-      ins.tyPct.value     = (it.tyPct!=null) ? it.tyPct : "";
+      setOverrideSlider("scale", it.scale!=null, it.scale!=null ? Math.round(it.scale*100) : 100);
+      setOverrideSlider("rotDeg", it.rotDeg!=null, it.rotDeg!=null ? it.rotDeg : 0);
+      setOverrideSlider("txPct", it.txPct!=null, it.txPct!=null ? it.txPct : 0);
+      setOverrideSlider("tyPct", it.tyPct!=null, it.tyPct!=null ? it.tyPct : 0);
     }
     function writeLiFromInspector(li){
       const url = li.querySelector(".u").value.trim();
@@ -647,11 +743,12 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
       if (at) it.at = at; else delete it.at;
       if (ins.atOnly.checked) it.only = true; else delete it.only;
 
-      const s = ins.scale.value.trim();
-      if (s!==""){ it.scale = clamp(parseInt(s,10)/100, 0.01, 5); } else delete it.scale;
+      if (ins.scaleEnabled.checked){
+        it.scale = clamp(parseInt(ins.scale.value,10)/100, 0.01, 5);
+      } else delete it.scale;
       ["rotDeg","txPct","tyPct"].forEach(k=>{
-        const v = ins[k].value.trim();
-        if (v!=="") it[k] = parseInt(v,10); else delete it[k];
+        if (ins[k + "Enabled"].checked) it[k] = parseInt(ins[k].value,10);
+        else delete it[k];
       });
 
       li.querySelector(".opt").value = itemToOptString(it);
@@ -679,6 +776,36 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
       if (!editMode || !data) { postEditMessage({ action:"update", item:null }); return; }
       postEditMessage({ action:"update", item:data.it, options:data.opts });
     }
+
+    function commitInspectorLive(){
+      if (!selectedLi) return;
+      sliderControls.forEach(syncOverrideSlider);
+      writeLiFromInspector(selectedLi);
+      if (editMode) maybePreviewSelected();
+    }
+
+    [ins.seconds, ins.maxSeconds, ins.at].forEach(el=>{
+      el.addEventListener("input", commitInspectorLive);
+      el.addEventListener("change", commitInspectorLive);
+    });
+    [ins.loop, ins.fit, ins.atOnly].forEach(el=>{
+      el.addEventListener("change", commitInspectorLive);
+    });
+    sliderControls.forEach(name=>{
+      ins[name].addEventListener("input", ()=>{
+        syncOverrideSlider(name, "range");
+        commitInspectorLive();
+      });
+      ins[name + "Num"].addEventListener("input", ()=>{
+        syncOverrideSlider(name, "number");
+        commitInspectorLive();
+      });
+      ins[name + "Num"].addEventListener("change", ()=>{
+        syncOverrideSlider(name, "number");
+        commitInspectorLive();
+      });
+      ins[name + "Enabled"].addEventListener("change", commitInspectorLive);
+    });
 
     // apply/clear buttons
     ins.apply.addEventListener("click", ()=>{
