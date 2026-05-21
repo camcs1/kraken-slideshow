@@ -15,6 +15,7 @@ It supports images (`png`, `jpg`, `gif`, `webp`) and video (`mp4`, `webm`) with 
 - **Global options**:
   - Image interval and video max length
   - Optional GIF order scrambling
+  - Night mode based on the Kraken browser/device local time, with black screen or dim overlay
   - Object fit: `contain` or `cover`
   - Background color
   - Circular mask vs. square
@@ -53,7 +54,7 @@ It supports images (`png`, `jpg`, `gif`, `webp`) and video (`mp4`, `webm`) with 
 - Add media items by URL.  
 - Optionally supply per-item JSON options.  
 - Drag and drop to reorder.
-2. Adjust global options (intervals, scaling, circle crop, offsets, etc.).
+2. Adjust global options (intervals, scaling, night mode, offsets, etc.).
 3. Use **Enter Edit Mode** to see a live test of the selected item with current unsaved settings.
 4. Click **Save** to store your configuration in localStorage.
 5. The Kraken Browser (`?kraken=1`) automatically reads those saved settings and plays the slideshow.
@@ -76,6 +77,7 @@ It supports images (`png`, `jpg`, `gif`, `webp`) and video (`mp4`, `webm`) with 
 ## Notes & Tips
 - **Circle padding** (default 4%) ensures content isn’t clipped on the very edge of the Kraken’s round LCD.
 - **Zoom + offsets** help you center subjects inside the circle.
+- **Night mode** uses the local time of the browser running on the Kraken display. Configure it from its own Night mode panel. The editor shows whether Night mode would be active now, but Edit Mode bypasses the black/dim overlay so item editing remains visible.
 - The **Preview** inside Configure is only for you — the Kraken continues running its own browser instance.
 - All data is stored in your PC’s **localStorage**. Each PC has its own saved config.
 

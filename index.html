@@ -31,6 +31,11 @@
       rotate(var(--rot,0deg));
   }
   .show{display:block; opacity:1}
+  .nightOverlay{
+    position:absolute; inset:0; z-index:20;
+    background:#000; opacity:0; pointer-events:none;
+    transition:opacity 500ms ease;
+  }
   .contain{object-fit:contain}
   .cover{object-fit:cover}
 
@@ -51,6 +56,15 @@
   .danger{background:#ef4444}
   .muted{color:#aaa;font-size:.9rem}
   .value{min-width:3ch;display:inline-block;text-align:right}
+  .optionLine{display:flex;align-items:center;gap:8px;margin-top:8px}
+  .optionLine label{margin:0;font-weight:600}
+  .nightPanel{border:1px solid #2a2a2a;background:#101010}
+  .nightPanelHeader{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px}
+  .nightPanelHeader h3{margin:0;font-size:1rem}
+  .nightStatus{display:inline-flex;align-items:center;gap:8px;padding:5px 10px;border-radius:999px;background:#1f2937;color:#d1d5db;font-size:.85rem;font-weight:700}
+  .nightStatus::before{content:"";width:8px;height:8px;border-radius:999px;background:#6b7280}
+  .nightStatus.active{background:#312e81;color:#fff}
+  .nightStatus.active::before{background:#a78bfa}
 
   /* Playlist list */
   .list{list-style:none;margin:0;padding:0}
@@ -124,6 +138,7 @@
 <div id="player" class="stage" style="display:none">
   <img id="imgEl" class="media contain" alt="media">
   <video id="vidEl" class="media contain" muted playsinline preload="auto"></video>
+  <div id="nightOverlay" class="nightOverlay" aria-hidden="true"></div>
 </div>
 
 <!-- Configure -->
@@ -269,9 +284,48 @@
       <label>Background</label>
       <input id="bg" type="text" value="#000000" placeholder="#000000 or black">
     </div>
-    <div style="display:flex;align-items:center;margin-top:8px">
+    <div class="optionLine">
       <input id="shuffleGifs" type="checkbox">
-      <label for="shuffleGifs" style="margin:0; font-weight:600">Scramble GIF order</label>
+      <label for="shuffleGifs">Scramble GIF order</label>
+    </div>
+  </div>
+
+  <div class="card nightPanel">
+    <div class="nightPanelHeader">
+      <h3>Night mode</h3>
+      <div id="nightStatus" class="nightStatus">Night mode inactive</div>
+    </div>
+    <div class="grid cols-2">
+      <div class="optionLine">
+        <input id="nightEnabled" type="checkbox">
+        <label for="nightEnabled">Enable night mode</label>
+      </div>
+      <div class="muted" style="align-self:center">Editor preview bypasses the black/dim overlay. This status shows whether normal playback would be in night mode now.</div>
+      <div>
+        <label>Night start</label>
+        <input id="nightStart" type="time" step="60" value="23:00">
+      </div>
+      <div>
+        <label>Night end</label>
+        <input id="nightEnd" type="time" step="60" value="07:00">
+      </div>
+      <div>
+        <label>Night action</label>
+        <select id="nightAction">
+          <option value="black">Black screen</option>
+          <option value="dim">Dim screen</option>
+        </select>
+      </div>
+      <div>
+        <label>Night dim amount</label>
+        <div class="sliderLine">
+          <input id="nightDim" type="range" min="10" max="95" value="70">
+          <input id="nightDimNum" type="number" min="10" max="95" step="1" value="70">
+          <span>%</span>
+        </div>
+        <div class="muted">Dim: <span id="nightDimVal" class="value">70</span>% black overlay.</div>
+      </div>
+      <div class="muted" style="grid-column:1/-1">Uses the local time of the device/browser running the Kraken display. Overnight ranges are supported, for example 23:00 to 07:00.</div>
     </div>
   </div>
 
@@ -379,6 +433,23 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
       el.style.setProperty('--tx',    (o.txPct||0) + '%');
       el.style.setProperty('--ty',    (o.tyPct||0) + '%');
     });
+  }
+  function minutesFromTime(value){
+    const m = /^(\d{1,2}):(\d{2})$/.exec(value || "");
+    if (!m) return null;
+    const h = clamp(parseInt(m[1],10), 0, 23);
+    const min = clamp(parseInt(m[2],10), 0, 59);
+    return h * 60 + min;
+  }
+  function isNightModeActiveForOptions(opts, now=new Date()){
+    if (!opts?.nightEnabled) return false;
+    const start = minutesFromTime(opts.nightStart || "23:00");
+    const end = minutesFromTime(opts.nightEnd || "07:00");
+    if (start === null || end === null || start === end) return false;
+    const current = now.getHours() * 60 + now.getMinutes();
+    return start < end
+      ? current >= start && current < end
+      : current >= start || current < end;
   }
   function postEditMessage(msg){
     try { localStorage.setItem(K_EDIT, JSON.stringify({ts:Date.now(), ...msg})); } catch {}
@@ -503,6 +574,14 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
       fit:      document.getElementById("fit"),
       bg:       document.getElementById("bg"),
       shuffleGifs: document.getElementById("shuffleGifs"),
+      nightEnabled: document.getElementById("nightEnabled"),
+      nightStart: document.getElementById("nightStart"),
+      nightEnd: document.getElementById("nightEnd"),
+      nightAction: document.getElementById("nightAction"),
+      nightDim: document.getElementById("nightDim"),
+      nightDimNum: document.getElementById("nightDimNum"),
+      nightDimVal: document.getElementById("nightDimVal"),
+      nightStatus: document.getElementById("nightStatus"),
       scale:    document.getElementById("scale"),
       scaleVal: document.getElementById("scaleVal"),
       rot:      document.getElementById("rot"),
@@ -512,6 +591,20 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
       ty:       document.getElementById("ty"),
       tyVal:    document.getElementById("tyVal"),
     };
+    function updateNightModeStatus(){
+      if (!els.nightStatus) return;
+      const active = isNightModeActiveForOptions(readGlobals());
+      els.nightStatus.classList.toggle("active", active);
+      els.nightStatus.textContent = active ? "Night mode active now" : "Night mode inactive";
+    }
+    function syncNightDim(value){
+      const v = clamp(parseInt(value,10)||70, 10, 95);
+      els.nightDim.value = v;
+      els.nightDimNum.value = v;
+      els.nightDimVal.textContent = v;
+      updateNightModeStatus();
+      if (editMode) maybePreviewSelected();
+    }
     ["scale","rot","tx","ty"].forEach(id=>{
       document.getElementById(id).addEventListener("input", ()=>{
         if(id==="scale") els.scaleVal.textContent = els.scale.value;
@@ -521,11 +614,15 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
         if (editMode) maybePreviewSelected();
       });
     });
-    ["interval","videoMax","fit","bg","shuffleGifs"].forEach(id=>{
+    els.nightDim.addEventListener("input", ()=> syncNightDim(els.nightDim.value));
+    els.nightDimNum.addEventListener("input", ()=> syncNightDim(els.nightDimNum.value));
+    ["interval","videoMax","fit","bg","shuffleGifs","nightEnabled","nightStart","nightEnd","nightAction"].forEach(id=>{
       document.getElementById(id).addEventListener("change", ()=>{
+        updateNightModeStatus();
         if (editMode) maybePreviewSelected();
       });
     });
+    setInterval(updateNightModeStatus, 30000);
 
     function readGlobals(){
       return {
@@ -534,6 +631,11 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
         fit: els.fit.value,
         bg:  els.bg.value || "#000000",
         shuffleGifs: !!els.shuffleGifs.checked,
+        nightEnabled: !!els.nightEnabled.checked,
+        nightStart: els.nightStart.value || "23:00",
+        nightEnd: els.nightEnd.value || "07:00",
+        nightAction: els.nightAction.value === "dim" ? "dim" : "black",
+        nightDim: clamp(parseInt(els.nightDim.value,10)||70, 10, 95),
         scale: Math.max(0.01, (parseInt(els.scale.value,10)||100) / 100),
         rotDeg: parseInt(els.rot.value,10)||0,
         txPct: parseInt(els.tx.value,10)||0,
@@ -546,10 +648,18 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
       els.fit.value      = o.fit || "contain";
       els.bg.value       = o.bg || "#000000";
       els.shuffleGifs.checked = !!o.shuffleGifs;
+      els.nightEnabled.checked = !!o.nightEnabled;
+      els.nightStart.value = o.nightStart || "23:00";
+      els.nightEnd.value = o.nightEnd || "07:00";
+      els.nightAction.value = o.nightAction === "dim" ? "dim" : "black";
+      els.nightDim.value = o.nightDim ?? 70;
+      els.nightDimNum.value = els.nightDim.value;
+      els.nightDimVal.textContent = els.nightDim.value;
       els.scale.value    = Math.round((o.scale ?? 1) * 100); els.scaleVal.textContent = els.scale.value;
       els.rot.value      = o.rotDeg ?? 0; els.rotVal.textContent = els.rot.value;
       els.tx.value       = o.txPct ?? 0;  els.txVal.textContent = els.tx.value;
       els.ty.value       = o.tyPct ?? 0;  els.tyVal.textContent = els.ty.value;
+      updateNightModeStatus();
     }
 
     /* ---- Persistence ---- */
@@ -840,6 +950,7 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
     /* Init Configure mode */
     document.getElementById("config").style.display = "block";
     loadFromLocal();
+    updateNightModeStatus();
   }
 
   /* ============================================================
@@ -849,12 +960,14 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
     const stage = document.getElementById("player");
     const imgEl = document.getElementById("imgEl");
     const vidEl = document.getElementById("vidEl");
+    const nightOverlay = document.getElementById("nightOverlay");
     stage.style.display = "flex";
 
     let items = JSON.parse(localStorage.getItem(K_PLAYLIST) || "[]");
     let o = Object.assign(
       { interval:30, videoMax:0, fit:"contain", bg:"#000000",
-        shuffleGifs:false, scale:1, rotDeg:0, txPct:0, tyPct:0 },
+        shuffleGifs:false, nightEnabled:false, nightStart:"23:00", nightEnd:"07:00",
+        nightAction:"black", nightDim:70, scale:1, rotDeg:0, txPct:0, tyPct:0 },
       JSON.parse(localStorage.getItem(K_OPTIONS) || "{}")
     );
 
@@ -915,11 +1028,26 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
     }
     setInterval(checkSchedule, 1000);
 
+    function isNightModeActive(now=new Date()){
+      return isNightModeActiveForOptions(o, now);
+    }
+    function applyNightModeVisual(){
+      if (!nightOverlay) return;
+      if (editMode || !isNightModeActive()) {
+        nightOverlay.style.opacity = "0";
+        return;
+      }
+      const opacity = o.nightAction === "dim" ? clamp((o.nightDim ?? 70) / 100, 0.1, 0.95) : 1;
+      nightOverlay.style.opacity = String(opacity);
+    }
+    setInterval(applyNightModeVisual, 1000);
+
     const clearTimer=()=>{ if(timer){ clearTimeout(timer); timer=null; } };
 
     function showImage(src, seconds, entry, opts, advance=true){
       clearTimer();
       applyVisual(stage, imgEl, vidEl, opts || o);
+      applyNightModeVisual();
       vidEl.pause(); vidEl.removeAttribute('src'); vidEl.load(); vidEl.classList.remove('show');
       imgEl.src = src; imgEl.classList.add('show');
 
@@ -932,6 +1060,7 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
     function showVideo(src, entry, opts, advance=true){
       clearTimer();
       applyVisual(stage, imgEl, vidEl, opts || o);
+      applyNightModeVisual();
       imgEl.classList.remove('show');
 
       const playOnce = !!entry.playOnce;
@@ -1025,7 +1154,8 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
         editMode = false;
         o = Object.assign(
           { interval:30, videoMax:0, fit:"contain", bg:"#000000",
-            shuffleGifs:false, scale:1, rotDeg:0, txPct:0, tyPct:0 },
+            shuffleGifs:false, nightEnabled:false, nightStart:"23:00", nightEnd:"07:00",
+            nightAction:"black", nightDim:70, scale:1, rotDeg:0, txPct:0, tyPct:0 },
           JSON.parse(localStorage.getItem(K_OPTIONS) || "{}")
         );
         items = JSON.parse(localStorage.getItem(K_PLAYLIST) || "[]") || items;
@@ -1042,11 +1172,13 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
       if (!editMode && e.key === K_OPTIONS) {
         o = Object.assign(
           { interval:30, videoMax:0, fit:"contain", bg:"#000000",
-            shuffleGifs:false, scale:1, rotDeg:0, txPct:0, tyPct:0 },
+            shuffleGifs:false, nightEnabled:false, nightStart:"23:00", nightEnd:"07:00",
+            nightAction:"black", nightDim:70, scale:1, rotDeg:0, txPct:0, tyPct:0 },
           JSON.parse(localStorage.getItem(K_OPTIONS) || "{}")
         );
         buildPlaybackOrder();
         orderPos = Math.max(0, playbackOrder.indexOf(idx));
+        applyNightModeVisual();
       }
         if (!editMode && e.key === K_PLAYLIST) {
           items = JSON.parse(localStorage.getItem(K_PLAYLIST) || "[]") || items;
