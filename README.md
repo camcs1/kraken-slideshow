@@ -7,13 +7,14 @@ It supports images (`png`, `jpg`, `gif`, `webp`) and video (`mp4`, `webm`) with 
 
 ## Features
 - **Configure button support**: When you click **Configure** in CAM, a configuration UI opens.
-- **Drag-and-drop playlist editor**: Add, remove, and reorder media URLs with simple handles.
+- **Drag-and-drop playlist editor**: Add, remove, and reorder media URLs with simple handles. Add buttons are available at the top and bottom of the list.
 - **Per-item options**: Add JSON options for each item, e.g.
-    - Images: `{ "seconds": 45 }` for custom duration
+    - Images/GIFs: `{ "seconds": 45 }` for custom duration
     - Videos: `{ "loop": true, "maxSeconds": 8 }`
     - Scheduled: `{ "at": "16:20" }` to show at 4:20 PM daily (add `{ "only": true }` to hide from normal rotation)
 - **Global options**:
   - Image interval and video max length
+  - Optional GIF order scrambling
   - Object fit: `contain` or `cover`
   - Background color
   - Circular mask vs. square
@@ -53,7 +54,7 @@ It supports images (`png`, `jpg`, `gif`, `webp`) and video (`mp4`, `webm`) with 
 - Optionally supply per-item JSON options.  
 - Drag and drop to reorder.
 2. Adjust global options (intervals, scaling, circle crop, offsets, etc.).
-3. Click **Preview** to see a live test of the current unsaved settings.
+3. Use **Enter Edit Mode** to see a live test of the selected item with current unsaved settings.
 4. Click **Save** to store your configuration in localStorage.
 5. The Kraken Browser (`?kraken=1`) automatically reads those saved settings and plays the slideshow.
 

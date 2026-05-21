@@ -3,9 +3,10 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Kraken Media Slideshow (edit mode + play-once + better object-fit)</title>
+<title>Kraken Media Slideshow</title>
 <style>
   html,body{height:100%;margin:0}
+  *{box-sizing:border-box}
   body{background:#000;color:#eaeaea;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
 
   /* ===== Player stage ===== */
@@ -40,7 +41,7 @@
   .cols-2{grid-template-columns:1fr 1fr}
   .card{background:#121212;border-radius:12px;padding:16px;box-shadow:0 6px 20px rgba(0,0,0,.25);margin-bottom:14px}
   label{display:block;margin:8px 0 6px;font-weight:600}
-  input[type="text"],input[type="number"],textarea,select{width:100%;padding:10px;border-radius:8px;border:1px solid #333;background:#0e0e0e;color:#eaeaea}
+  input[type="text"],input[type="number"],textarea,select{width:100%;min-width:0;padding:10px;border-radius:8px;border:1px solid #333;background:#0e0e0e;color:#eaeaea}
   input[type="checkbox"]{transform:scale(1.2);margin-right:8px}
   textarea{min-height:120px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
   .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
@@ -54,18 +55,31 @@
   /* Playlist list */
   .list{list-style:none;margin:0;padding:0}
   .item{
-    display:grid;grid-template-columns:auto auto 1fr auto;gap:10px;align-items:center;
+    display:grid;
+    grid-template-columns:auto auto minmax(260px,1.6fr) minmax(220px,1fr) auto auto;
+    gap:10px;align-items:center;
     background:#0f0f0f;border:1px solid #272727;border-radius:10px;padding:10px;margin:8px 0;
   }
   .grab{cursor:grab;user-select:none;font-weight:700;padding:6px 8px;background:#1b1b1b;border-radius:8px}
   .dragging{opacity:.6}
   .preview{width:60px;height:40px;object-fit:cover;display:none;border-radius:6px}
 
-  .u{width:100%}
-  .opt{width:280px}
+  .u,.opt{width:100%;min-width:0}
   .rm{background:#ef4444}
   .edit{background:#334155}
   .selected{outline:2px solid #6d5ef9}
+  .listFooter{margin-top:12px;display:flex;justify-content:flex-start}
+  @media (max-width:760px){
+    .item{grid-template-columns:auto auto 1fr auto;grid-template-areas:
+      "grab preview url edit"
+      "grab preview opt remove";}
+    .grab{grid-area:grab}
+    .preview{grid-area:preview}
+    .u{grid-area:url}
+    .opt{grid-area:opt}
+    .edit{grid-area:edit}
+    .rm{grid-area:remove}
+  }
 
   /* Inspector */
   .inspector-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
@@ -118,6 +132,7 @@
     </div>
     <div class="muted">Drag the ☰ handle to reorder. Select a row and tweak settings in the inspector. In <b>Edit Mode</b>, the Kraken shows the selected item live and updates on every change. Press <b>Save</b> to exit Edit Mode and resume the slideshow.</div>
     <ul id="list" class="list"></ul>
+    <div class="listFooter"><button id="addBottom" class="secondary">Add item</button></div>
   </div>
 
   <!-- Per-item Inspector -->
@@ -168,10 +183,6 @@
         <input id="i_atOnly" type="checkbox">
         <label for="i_atOnly" style="margin:0; font-weight:600">Only at scheduled time</label>
       </div>
-      <div style="grid-column:1/-1;display:flex;align-items:center;margin-top:4px">
-        <input id="i_playOnce" type="checkbox">
-        <label for="i_playOnce" style="margin:0; font-weight:600">Play once</label>
-      </div>
     </div>
 
     <div class="inspector-grid" style="margin-top:12px">
@@ -194,9 +205,6 @@
       </div>
     </div>
 
-    <div class="muted" style="margin-top:10px">
-      <b>Play once:</b> Videos advance on <code>ended</code> (loop disabled). GIFs/images show for this item's <b>seconds</b> (or global interval if not set), then advance. Browsers don’t expose a GIF’s intrinsic duration.
-    </div>
   </div>
 
   <!-- Global Options -->
@@ -219,6 +227,10 @@
     <div>
       <label>Background</label>
       <input id="bg" type="text" value="#000000" placeholder="#000000 or black">
+    </div>
+    <div style="display:flex;align-items:center;margin-top:8px">
+      <input id="shuffleGifs" type="checkbox">
+      <label for="shuffleGifs" style="margin:0; font-weight:600">Scramble GIF order</label>
     </div>
   </div>
 
@@ -295,7 +307,6 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
   }
   function itemToOptString(it){
     const o = {};
-    if (it.playOnce === true) o.playOnce = true;
     if (it.type === "image" && it.seconds) o.seconds = it.seconds;
     if (it.type === "video"){
       if (typeof it.loop === "boolean") o.loop = it.loop;
@@ -350,11 +361,9 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
         <div class="grab" title="Drag to reorder">☰</div>
         <img class="preview" loading="lazy" alt="">
         <input class="u" type="text" placeholder="https://example.com/image.webp or video.mp4" value="${url.replace(/"/g,'&quot;')}">
-        <div style="display:flex;gap:10px;align-items:center">
-          <input class="opt" type="text" placeholder='Optional JSON (e.g. {"seconds":45,"playOnce":true})' value="${opt.replace(/"/g,'&quot;')}">
-          <button class="edit">Edit</button>
-          <button class="rm">Remove</button>
-        </div>
+        <input class="opt" type="text" placeholder='Optional JSON (e.g. {"seconds":45})' value="${opt.replace(/"/g,'&quot;')}">
+        <button class="edit">Edit</button>
+        <button class="rm">Remove</button>
       `;
 
       const urlInput = li.querySelector(".u");
@@ -452,6 +461,7 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
       videoMax: document.getElementById("videoMax"),
       fit:      document.getElementById("fit"),
       bg:       document.getElementById("bg"),
+      shuffleGifs: document.getElementById("shuffleGifs"),
       scale:    document.getElementById("scale"),
       scaleVal: document.getElementById("scaleVal"),
       rot:      document.getElementById("rot"),
@@ -470,7 +480,7 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
         if (editMode) maybePreviewSelected();
       });
     });
-    ["interval","videoMax","fit","bg"].forEach(id=>{
+    ["interval","videoMax","fit","bg","shuffleGifs"].forEach(id=>{
       document.getElementById(id).addEventListener("change", ()=>{
         if (editMode) maybePreviewSelected();
       });
@@ -482,6 +492,7 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
         videoMax: Math.max(0, parseInt(els.videoMax.value||"0",10)),
         fit: els.fit.value,
         bg:  els.bg.value || "#000000",
+        shuffleGifs: !!els.shuffleGifs.checked,
         scale: Math.max(0.01, (parseInt(els.scale.value,10)||100) / 100),
         rotDeg: parseInt(els.rot.value,10)||0,
         txPct: parseInt(els.tx.value,10)||0,
@@ -493,6 +504,7 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
       els.videoMax.value = o.videoMax ?? 0;
       els.fit.value      = o.fit || "contain";
       els.bg.value       = o.bg || "#000000";
+      els.shuffleGifs.checked = !!o.shuffleGifs;
       els.scale.value    = Math.round((o.scale ?? 1) * 100); els.scaleVal.textContent = els.scale.value;
       els.rot.value      = o.rotDeg ?? 0; els.rotVal.textContent = els.rot.value;
       els.tx.value       = o.txPct ?? 0;  els.txVal.textContent = els.tx.value;
@@ -515,8 +527,8 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
       if(!items.length){
         fromModel([
           { src:"https://www.gstatic.com/webp/gallery/1.webp", type:"image" },
-          { src:"https://media.giphy.com/media/l0HlQ7LRal8X9sWzO/giphy.gif", type:"image", seconds:8, playOnce:true },
-          { src:"https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4", type:"video", loop:false, playOnce:true }
+          { src:"https://media.giphy.com/media/l0HlQ7LRal8X9sWzO/giphy.gif", type:"image", seconds:8 },
+          { src:"https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4", type:"video", loop:false }
         ]);
       }
     }
@@ -528,13 +540,15 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
     }
 
     /* ---- Buttons ---- */
-    document.getElementById("add").addEventListener("click", ()=>{
+    function addBlankItem(){
       const li = createItem();
       listEl.appendChild(li);
       // Auto-select the new row
       selectLi(li);
       if (editMode) maybePreviewSelected();
-    });
+    }
+    document.getElementById("add").addEventListener("click", addBlankItem);
+    document.getElementById("addBottom").addEventListener("click", addBlankItem);
     document.getElementById("exportTxt").addEventListener("click", ()=>{
       const t = exportText();
       navigator.clipboard.writeText(t).catch(()=>{});
@@ -575,7 +589,6 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
       fit:     document.getElementById("i_fit"),
       at:      document.getElementById("i_at"),
       atOnly:  document.getElementById("i_atOnly"),
-      playOnce:document.getElementById("i_playOnce"),
       scale:   document.getElementById("i_scale"),
       rotDeg:  document.getElementById("i_rotDeg"),
       txPct:   document.getElementById("i_txPct"),
@@ -600,7 +613,6 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
       ins.fit.value       = it.fit ? it.fit : "inherit";
       ins.at.value        = it.at || "";
       ins.atOnly.checked  = !!it.only;
-      ins.playOnce.checked= !!it.playOnce;
       ins.scale.value     = (it.scale!=null) ? Math.round(it.scale*100) : "";
       ins.rotDeg.value    = (it.rotDeg!=null) ? it.rotDeg : "";
       ins.txPct.value     = (it.txPct!=null) ? it.txPct : "";
@@ -613,8 +625,7 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
       const it = parseItem(url, li.querySelector(".opt").value.trim());
       it.type = type;
 
-      // playOnce for both images and videos
-      if (ins.playOnce.checked) it.playOnce = true; else delete it.playOnce;
+      delete it.playOnce;
 
       const seconds = parseInt(ins.seconds.value||"0",10);
       if (type==="image"){
@@ -716,15 +727,15 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
     let items = JSON.parse(localStorage.getItem(K_PLAYLIST) || "[]");
     let o = Object.assign(
       { interval:30, videoMax:0, fit:"contain", bg:"#000000",
-        scale:1, rotDeg:0, txPct:0, tyPct:0 },
+        shuffleGifs:false, scale:1, rotDeg:0, txPct:0, tyPct:0 },
       JSON.parse(localStorage.getItem(K_OPTIONS) || "{}")
     );
 
     if(!items.length){
       localStorage.setItem(K_PLAYLIST, JSON.stringify([
         { src:"https://www.gstatic.com/webp/gallery/1.webp", type:"image" },
-        { src:"https://media.giphy.com/media/l0HlQ7LRal8X9sWzO/giphy.gif", type:"image", seconds:8, playOnce:true },
-        { src:"https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4", type:"video", loop:false, playOnce:true }
+        { src:"https://media.giphy.com/media/l0HlQ7LRal8X9sWzO/giphy.gif", type:"image", seconds:8 },
+        { src:"https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4", type:"video", loop:false }
       ]));
       location.reload();
     }
@@ -732,10 +743,30 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
     let idx=0, timer=null;
     let editMode=false;        // if true, freeze slideshow timers
     let lastMsgTs=0;
+    let playbackOrder=[];
+    let orderPos=0;
 
+    function isGifItem(it){ return /\.gif(\?.*)?$/i.test(it?.src || ""); }
+    function shuffleArray(arr){
+      const a = arr.slice();
+      for (let i = a.length - 1; i > 0; i--){
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+      }
+      return a;
+    }
+    function buildPlaybackOrder(){
+      const base = items.map((_, i)=>i).filter(i => !(items[i].at && items[i].only));
+      if (!o.shuffleGifs) { playbackOrder = base; return; }
+      const gifSlots = base.filter(i => isGifItem(items[i]));
+      const shuffledGifs = shuffleArray(gifSlots);
+      let gifPos = 0;
+      playbackOrder = base.map(i => isGifItem(items[i]) ? shuffledGifs[gifPos++] : i);
+    }
     function resetIndex(){
-      const i = items.findIndex(it => !(it.at && it.only));
-      idx = i === -1 ? 0 : i;
+      buildPlaybackOrder();
+      orderPos = 0;
+      idx = playbackOrder.length ? playbackOrder[0] : 0;
     }
     resetIndex();
 
@@ -750,6 +781,8 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
       if (found !== -1){
         scheduleShown[time] = day;
         idx = found;
+        orderPos = playbackOrder.indexOf(found);
+        if (orderPos === -1) orderPos = 0;
         render();
       }
     }
@@ -764,9 +797,7 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
       imgEl.src = src; imgEl.classList.add('show');
 
       if (!editMode && advance){
-        // If playOnce is requested for images/GIFs, we rely on per-item seconds or global interval
-        const base = Math.max(1, seconds || (opts?.interval ?? o.interval) || 30);
-        const s = entry?.playOnce ? base : base; // same timing, semantics differ
+        const s = Math.max(1, seconds || (opts?.interval ?? o.interval) || 30);
         timer = setTimeout(next, s*1000);
       }
     }
@@ -817,16 +848,18 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
     }
     function next(){
         if (!items.length) return;
-        let start = idx;
-        do {
-          idx = (idx + 1) % items.length;
-          if (!(items[idx].at && items[idx].only)) {
-            render();
-            return;
-          }
-        } while (idx !== start);
-        imgEl.classList.remove('show');
-        vidEl.classList.remove('show');
+        if (!playbackOrder.length) {
+          imgEl.classList.remove('show');
+          vidEl.classList.remove('show');
+          return;
+        }
+        orderPos += 1;
+        if (orderPos >= playbackOrder.length){
+          buildPlaybackOrder();
+          orderPos = 0;
+        }
+        idx = playbackOrder[orderPos];
+        render();
     }
 
     if (!(items[idx] && items[idx].at && items[idx].only)) render();
@@ -865,7 +898,7 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
         editMode = false;
         o = Object.assign(
           { interval:30, videoMax:0, fit:"contain", bg:"#000000",
-            scale:1, rotDeg:0, txPct:0, tyPct:0 },
+            shuffleGifs:false, scale:1, rotDeg:0, txPct:0, tyPct:0 },
           JSON.parse(localStorage.getItem(K_OPTIONS) || "{}")
         );
         items = JSON.parse(localStorage.getItem(K_PLAYLIST) || "[]") || items;
@@ -882,9 +915,11 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
       if (!editMode && e.key === K_OPTIONS) {
         o = Object.assign(
           { interval:30, videoMax:0, fit:"contain", bg:"#000000",
-            scale:1, rotDeg:0, txPct:0, tyPct:0 },
+            shuffleGifs:false, scale:1, rotDeg:0, txPct:0, tyPct:0 },
           JSON.parse(localStorage.getItem(K_OPTIONS) || "{}")
         );
+        buildPlaybackOrder();
+        orderPos = Math.max(0, playbackOrder.indexOf(idx));
       }
         if (!editMode && e.key === K_PLAYLIST) {
           items = JSON.parse(localStorage.getItem(K_PLAYLIST) || "[]") || items;
