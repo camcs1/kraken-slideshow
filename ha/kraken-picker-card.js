@@ -6,7 +6,7 @@
  * on screen is outlined, and "Back to slideshow" appears while one is held.
  *
  * Register as a dashboard resource (JavaScript module):
- *   https://camcs1.github.io/kraken-slideshow/ha/kraken-picker-card.js?v=1
+ *   https://camcs1.github.io/kraken-slideshow/ha/kraken-picker-card.js?v=2
  *
  *   type: custom:kraken-picker-card
  *   # all optional:
@@ -14,18 +14,20 @@
  *   columns: 4            # thumbnails per row
  *   max_height: 420px     # scrolls beyond this; "none" for no limit
  *   animate: current      # current | all | none  (GIFs on hover always play)
+ *   collapsed: false      # start folded; tapping the header toggles (remembered per browser)
  *   playlist_entity: sensor.kraken_lcd_playlist
  *   pick_entity: text.kraken_lcd_pick
  *   mode_entity: sensor.kraken_lcd_mode
  *   slideshow_entity: button.kraken_lcd_slideshow
  */
-const KPC_VERSION = "1.0.0";
+const KPC_VERSION = "1.1.0";
 
 const KPC_DEFAULTS = {
   title: "Pick a picture",
   columns: 4,
   max_height: "420px",
   animate: "current",
+  collapsed: false,
   playlist_entity: "sensor.kraken_lcd_playlist",
   pick_entity: "text.kraken_lcd_pick",
   mode_entity: "sensor.kraken_lcd_mode",
@@ -35,7 +37,11 @@ const KPC_DEFAULTS = {
 const KPC_STYLE = `
   :host { display: block; }
   ha-card { overflow: hidden; }
-  .head { display: flex; align-items: center; gap: 8px; padding: 12px 16px 8px; }
+  .head { display: flex; align-items: center; gap: 8px; padding: 12px 16px 8px; cursor: pointer; user-select: none; }
+  .collapsed .head { padding-bottom: 12px; }
+  .collapsed .grid { display: none; }
+  .chev { width: 24px; height: 24px; flex: none; fill: var(--secondary-text-color); transition: transform .2s ease; }
+  .collapsed .chev { transform: rotate(-90deg); }
   .head .title { flex: 1; min-width: 0; }
   .head .title b { display: block; font-size: 16px; font-weight: 500; }
   .head .title span { display: block; font-size: 12px; color: var(--secondary-text-color);
@@ -84,7 +90,8 @@ class KrakenPickerCard extends HTMLElement {
     const c = this._config;
     this.shadowRoot.innerHTML = `<style>${KPC_STYLE}</style>
       <ha-card>
-        <div class="head">
+        <div class="head" role="button" tabindex="0" aria-expanded="true">
+          <svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M7.41 8.58 12 13.17l4.59-4.59L18 10l-6 6-6-6z"/></svg>
           <div class="title"><b></b><span></span></div>
           <button class="back" hidden>Back to slideshow</button>
         </div>
@@ -98,7 +105,15 @@ class KrakenPickerCard extends HTMLElement {
     this._titleEl.textContent = c.title || "";
     this._grid.style.gridTemplateColumns = `repeat(${Math.max(1, Number(c.columns) || 4)}, minmax(0, 1fr))`;
     if (c.max_height && c.max_height !== "none") this._grid.style.maxHeight = c.max_height;
-    this._backEl.addEventListener("click", () => this._call("button", "press", c.slideshow_entity));
+    this._backEl.addEventListener("click", e => { e.stopPropagation(); this._call("button", "press", c.slideshow_entity); });
+    // Collapsible: click the header. The choice is remembered per browser.
+    const head = $(".head");
+    const toggle = () => this._setCollapsed(!this._collapsed, true);
+    head.addEventListener("click", toggle);
+    head.addEventListener("keydown", e => { if (e.target === head && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); toggle(); } });
+    let saved = null;
+    try { saved = localStorage.getItem(this._storeKey()); } catch (e) { /* storage blocked */ }
+    this._setCollapsed(saved !== null ? saved === "1" : !!c.collapsed, false);
     this._listKey = null;
     this._current = undefined;
   }
@@ -184,6 +199,18 @@ class KrakenPickerCard extends HTMLElement {
       this._grid.appendChild(tile);
       this._tiles.push(tile);
     });
+  }
+
+  _storeKey() { return `kraken-picker-collapsed:${this._config.playlist_entity}`; }
+
+  _setCollapsed(on, remember) {
+    this._collapsed = on;
+    const card = this.shadowRoot.querySelector("ha-card");
+    card.classList.toggle("collapsed", on);
+    this.shadowRoot.querySelector(".head").setAttribute("aria-expanded", String(!on));
+    if (remember) { try { localStorage.setItem(this._storeKey(), on ? "1" : "0"); } catch (e) { /* ignore */ } }
+    // Let the sections grid re-measure the card's height.
+    this.dispatchEvent(new Event("iron-resize", { bubbles: true, composed: true }));
   }
 
   _setLive(tile, on) {

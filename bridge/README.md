@@ -172,12 +172,12 @@ Add it once under **Settings → Dashboards → ⋮ → Resources** as a JavaScr
 module, straight from GitHub Pages:
 
 ```
-https://camcs1.github.io/kraken-slideshow/ha/kraken-picker-card.js?v=1
+https://camcs1.github.io/kraken-slideshow/ha/kraken-picker-card.js?v=2
 ```
 
 then add a card with `type: custom:kraken-picker-card`. Options (all optional):
 `title`, `columns` (4), `max_height` (`420px`, or `none`), `animate`
-(`current` / `all` / `none`), and the entity IDs if yours differ. After
+(`current` / `all` / `none`), `collapsed` (start folded; tapping the header folds or unfolds it, remembered per browser), and the entity IDs if yours differ. After
 changing the card file, bump `?v=` on the resource so browsers fetch it again.
 
 **Any command over MQTT.** Publish the command text to
