@@ -92,7 +92,7 @@ module.exports = function startHaMqtt(opts) {
     sensor("mode", "Mode", "mdi:monitor-screenshot", "mode", {
       // The picker card highlights the item on screen from this.
       json_attributes_topic: `${base}/state`,
-      json_attributes_template: "{{ {'index': value_json.index, 'name': value_json.name} | tojson }}",
+      json_attributes_template: "{{ {'index': value_json.index, 'name': value_json.name, 'view': value_json.view} | tojson }}",
     });
     // Playlist for the picture picker card: state = item count, items as an attribute.
     out.push(["sensor", "playlist", common("sensor", "playlist", "Playlist", {

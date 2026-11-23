@@ -6,7 +6,7 @@
  * on screen is outlined, and "Back to slideshow" appears while one is held.
  *
  * Register as a dashboard resource (JavaScript module):
- *   https://camcs1.github.io/kraken-slideshow/ha/kraken-picker-card.js?v=3
+ *   https://camcs1.github.io/kraken-slideshow/ha/kraken-picker-card.js?v=4
  *
  *   type: custom:kraken-picker-card
  *   # all optional:
@@ -20,7 +20,7 @@
  *   mode_entity: sensor.kraken_lcd_mode
  *   slideshow_entity: button.kraken_lcd_slideshow
  */
-const KPC_VERSION = "1.2.0";
+const KPC_VERSION = "1.3.0";
 
 const KPC_DEFAULTS = {
   title: "Pick a picture",
@@ -242,7 +242,8 @@ class KrakenPickerCard extends HTMLElement {
  */
 class KrakenScreenCard extends HTMLElement {
   setConfig(config) {
-    this._config = Object.assign({ entity: "image.kraken_lcd_now", ring: true }, config || {});
+    // view_entity: carries the page's fit/background/zoom/rotation/offset (attribute "view")
+    this._config = Object.assign({ entity: "image.kraken_lcd_now", view_entity: "sensor.kraken_lcd_mode", ring: true }, config || {});
     if (this.shadowRoot) this._applyConfig();
   }
   static getStubConfig() { return {}; }
@@ -260,7 +261,9 @@ class KrakenScreenCard extends HTMLElement {
           .screen { width: min(100cqw, 100cqh); aspect-ratio: 1; border-radius: 50%; overflow: hidden; position: relative;
             background: #000; box-sizing: border-box; }
           .screen.ring { box-shadow: 0 0 0 2px var(--divider-color, #444), 0 4px 14px rgba(0,0,0,.45); }
-          img { width: 100%; height: 100%; object-fit: cover; display: block; }
+          img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; display: block;
+            transform-origin: 50% 50%;
+            transform: translate(var(--tx, 0%), var(--ty, 0%)) scale(var(--scale, 1)) rotate(var(--rot, 0deg)); }
           img[hidden] { display: none; }
         </style>
         <ha-card><div class="screen"><img alt="Kraken screen"></div></ha-card>`;
@@ -278,6 +281,20 @@ class KrakenScreenCard extends HTMLElement {
       this._pic = pic;
       if (pic) { this._img.hidden = false; this._img.src = hass.hassUrl ? hass.hassUrl(pic) : pic; }
       else { this._img.hidden = true; this._img.removeAttribute("src"); }
+    }
+    // Mirror the Kraken page's own display settings (same CSS transform it uses).
+    const vs = hass.states[this._config.view_entity];
+    const v = (vs && vs.attributes.view) || null;
+    const key = JSON.stringify(v);
+    if (key !== this._viewKey) {
+      this._viewKey = key;
+      const s = this._img.style;
+      s.objectFit = v && v.fit === "cover" ? "cover" : "contain";
+      s.setProperty("--scale", v ? String(v.scale || 1) : "1");
+      s.setProperty("--rot", `${v ? v.rotDeg || 0 : 0}deg`);
+      s.setProperty("--tx", `${v ? v.txPct || 0 : 0}%`);
+      s.setProperty("--ty", `${v ? v.tyPct || 0 : 0}%`);
+      this._screen.style.background = (v && v.bg) || "#000";
     }
   }
 

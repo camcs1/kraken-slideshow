@@ -172,7 +172,7 @@ Add it once under **Settings → Dashboards → ⋮ → Resources** as a JavaScr
 module, straight from GitHub Pages:
 
 ```
-https://camcs1.github.io/kraken-slideshow/ha/kraken-picker-card.js?v=3
+https://camcs1.github.io/kraken-slideshow/ha/kraken-picker-card.js?v=4
 ```
 
 then add a card with `type: custom:kraken-picker-card`. Options (all optional):
@@ -181,8 +181,9 @@ then add a card with `type: custom:kraken-picker-card`. Options (all optional):
 changing the card file, bump `?v=` on the resource so browsers fetch it again.
 
 The same file also defines `custom:kraken-screen-card`: the **Now showing** image
-drawn round like the pump screen (options `entity`, default
-`image.kraken_lcd_now`, and `ring`). It fills whatever grid space it's given,
+drawn round like the pump screen, using the same fit, background, zoom, rotation
+and offset the Kraken page applies to that item (options `entity`, default
+`image.kraken_lcd_now`, `view_entity`, default `sensor.kraken_lcd_mode`, and `ring`). It fills whatever grid space it's given,
 e.g. `grid_options: {columns: 6, rows: 2}`.
 
 **Any command over MQTT.** Publish the command text to

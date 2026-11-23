@@ -431,7 +431,10 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
     });
     return o;
   }
+  let lastVisual = null;   // what applyVisual last drew with, reported to the bridge for previews
   function applyVisual(stageEl, imgEl, vidEl, o){
+    lastVisual = { fit: o.fit || "contain", bg: o.bg || "#000", scale: Number(o.scale) || 1,
+                   rotDeg: Number(o.rotDeg) || 0, txPct: Number(o.txPct) || 0, tyPct: Number(o.tyPct) || 0 };
     stageEl.style.setProperty('--bg',  o.bg || "#000");
     [imgEl,vidEl].forEach(el=>{
       el.classList.toggle('contain', o.fit === 'contain');
@@ -1274,6 +1277,7 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
         name: vizOn ? viz.name : remoteSrc ? null : (it ? itemName(it, idx) : null),
         src: vizOn ? null : (remoteSrc || (it && it.src) || null),
         paused, editMode, night: isNightModeActive(), nightOverride,
+        view: vizOn ? null : lastVisual,
         visualizer: viz ? { on: vizOn, preset: viz.name, fps: viz.fps, maxFps: viz.maxFps, res: viz.res,
                             audio: vizOn && performance.now() - viz.audioAt < 1000,
                             presets: viz.keys.length, error: viz.error } : null

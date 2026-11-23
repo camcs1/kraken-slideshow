@@ -257,6 +257,7 @@ function startServer() {
       name: s ? s.name : null,
       index: s ? s.index : null,
       src: s && !vizOn ? s.src : null,
+      view: s && !vizOn ? (s.view || null) : null,   // fit/bg/zoom/rotation/offset the page drew with
       night_mode: !s ? "auto" : s.nightOverride === true ? "on" : s.nightOverride === false ? "off" : "auto",
       night: !!(s && s.night),
       preset: v ? v.preset : null,
