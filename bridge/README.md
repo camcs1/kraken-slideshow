@@ -112,6 +112,25 @@ whatever the PC is playing. Any slideshow command (`slideshow`, `next`,
 | `visualizer off` | Back to the slideshow |
 | `presets` (CLI) / `/presets` | Preset names (loaded in the background once the page connects) |
 
+### Track titles
+
+When the track changes, its title and artist pop up in the middle of the screen
+and fade out, like MilkDrop's song titles. They also appear a moment after the
+visualizer starts. The track comes from Windows' media controls (whatever shows
+in the volume flyout: Spotify, YouTube Music, a browser tab…), read by
+`kraken-nowplaying.ps1`, which the bridge runs hidden while a page is connected.
+It needs nothing installed.
+
+| Command | Effect |
+|---|---|
+| `titles visualizer` | Only over the visualizer (default) |
+| `titles always` | Over the slideshow too |
+| `titles off` | Never |
+| `titles show` | Pop the current title now (any mode) |
+
+The choice is saved on the Kraken page. Titles are skipped while night mode
+blacks the screen out.
+
 **How the audio gets there.** On `visualizer on` the bridge starts
 [kraken-audio.py](kraken-audio.py), which records the default output device
 with WASAPI loopback and sends ~60 UDP packets a second to the bridge on port
@@ -148,10 +167,12 @@ discovery. Nothing needs setting up in HA.
 | `switch.kraken_lcd_visualizer` | Visualizer on/off |
 | `select.kraken_lcd_preset` | Start the visualizer on a chosen preset (all names listed) |
 | `select.kraken_lcd_night` | Night mode: `auto` (schedule), `on`, `off` |
+| `select.kraken_lcd_titles` | Track titles: `visualizer`, `always`, `off` |
 | `text.kraken_lcd_pick` | Hold an item by number (1-based, as the Position sensor shows) or name |
 | `sensor.kraken_lcd_mode` | `slideshow`, `picked`, `paused`, `remote`, `visualizer`, `disconnected` |
 | `sensor.kraken_lcd_position` | `20 / 56`, or the preset and fps in visualizer mode |
 | `sensor.kraken_lcd_showing` | Item or preset name |
+| `sensor.kraken_lcd_track` | Now playing on the PC (`Artist – Title`; `playing` attribute) |
 | `sensor.kraken_lcd_fps` | Visualizer frame rate (diagnostic) |
 | `binary_sensor.kraken_lcd_page` | Whether the Kraken page is connected (diagnostic) |
 | `image.kraken_lcd_now` | The image on the screen |

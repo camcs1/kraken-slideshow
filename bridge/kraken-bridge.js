@@ -19,6 +19,7 @@
  *                   node kraken-bridge.js send visualizer on [preset words]
  *                   node kraken-bridge.js send visualizer next|prev|random|off
  *                   node kraken-bridge.js send visualizer res 480
+ *                   node kraken-bridge.js send titles visualizer|always|off|show
  *                   node kraken-bridge.js status
  *                   node kraken-bridge.js presets
  *                   node kraken-bridge.js playlist [names]
@@ -38,8 +39,9 @@ const HOST = process.env.KRAKEN_BRIDGE_HOST || "127.0.0.1";
 const PORT = Number(process.env.KRAKEN_BRIDGE_PORT || 27880);
 const AUDIO_PORT = Number(process.env.KRAKEN_AUDIO_PORT || 27881);       // UDP from kraken-audio.py
 const PYTHON = process.env.KRAKEN_PYTHON || "python";
-const ACTIONS = new Set(["next", "prev", "pause", "resume", "slideshow", "pick", "hold", "show", "goto", "night", "reload", "visualizer"]);
+const ACTIONS = new Set(["next", "prev", "pause", "resume", "slideshow", "pick", "hold", "show", "goto", "night", "reload", "visualizer", "titles"]);
 const VIZ_MODES = ["on", "off", "next", "prev", "random", "res", "fps"];
+const TITLE_MODES = ["visualizer", "always", "off", "show"];   // when the page pops the track title
 
 /* ------------------------------------------------------------------ CLI */
 if (["send", "status", "playlist", "presets"].includes(process.argv[2])) {
@@ -61,6 +63,7 @@ function cliArgsToCommand([action, ...rest]) {
     case "goto":  return { action, index: Number(rest[0]) };
     case "pick":  return /^\d+$/.test(text) ? { action, index: Number(text) } : { action, name: text };
     case "night": return { action, mode: (rest[0] || "auto").toLowerCase() };
+    case "titles": return { action, mode: (rest[0] || "show").toLowerCase() };
     case "visualizer": {
       const mode = (rest[0] || "on").toLowerCase();
       const arg = rest.slice(1).join(" ").trim();
@@ -155,12 +158,69 @@ function startServer() {
   udp.bind(AUDIO_PORT, "127.0.0.1");
   setInterval(() => { audioRate = audioPackets / 5; audioPackets = 0; }, 5000).unref();
 
+  /* --- Now playing ----------------------------------------------------
+     kraken-nowplaying.ps1 reads Windows' media session and prints a JSON line
+     per track or play-state change. It runs while a page is connected; the
+     page pops the title on screen (MilkDrop-style) and HA gets a sensor. */
+  let npProc = null, npRetry = null, npFails = 0;
+  let nowPlaying = { title: "", artist: "", album: "", playing: false, app: "" };
+
+  function startNowPlaying() {
+    if (npProc || npRetry) return;
+    const script = path.join(__dirname, "kraken-nowplaying.ps1");
+    const proc = spawn("powershell.exe",
+      ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", script, "-ParentPid", String(process.pid)],
+      { stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
+    npProc = proc;
+    const startedAt = Date.now();
+    log(`now-playing helper started (pid ${proc.pid})`);
+    let pending = "";
+    proc.stdout.setEncoding("utf8");
+    proc.stdout.on("data", d => {
+      pending += d;
+      let nl;
+      while ((nl = pending.indexOf("\n")) >= 0) {
+        const line = pending.slice(0, nl).trim();
+        pending = pending.slice(nl + 1);
+        if (!line) continue;
+        try {
+          const np = JSON.parse(line);
+          const trackChanged = np.title !== nowPlaying.title || np.artist !== nowPlaying.artist;
+          nowPlaying = { title: np.title || "", artist: np.artist || "", album: np.album || "", playing: !!np.playing, app: np.app || "" };
+          broadcast(clients, { type: "nowplaying", ...nowPlaying, changed: trackChanged });
+          haUpdate();
+        } catch { /* ignore junk */ }
+      }
+    });
+    proc.stderr.on("data", d => String(d).split(/\r?\n/).filter(Boolean).forEach(l => log(`now-playing: ${l}`)));
+    proc.on("error", err => log(`now-playing helper failed to start: ${err.message}`));
+    proc.on("exit", code => {
+      if (npProc !== proc) return;            // stopped on purpose
+      npProc = null;
+      log(`now-playing helper exited (${code})`);
+      // Restart while pages are connected, backing off if it keeps dying.
+      npFails = Date.now() - startedAt < 30000 ? npFails + 1 : 0;
+      if (clients.size) {
+        npRetry = setTimeout(() => { npRetry = null; if (clients.size) startNowPlaying(); }, Math.min(60000, 2000 * 2 ** npFails));
+        npRetry.unref();
+      }
+    });
+  }
+
+  function stopNowPlaying() {
+    if (npRetry) { clearTimeout(npRetry); npRetry = null; }
+    const proc = npProc;
+    if (!proc) return;
+    npProc = null;
+    try { proc.kill(); } catch {}
+  }
+
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, `http://${req.headers.host || HOST}`);
     const { lastState, playlist, caps, presets } = primary();
     try {
       if (url.pathname === "/status") {
-        return json(res, 200, { clients: clients.size, state: lastState, caps,
+        return json(res, 200, { clients: clients.size, state: lastState, caps, nowPlaying, nowPlayingHelper: !!npProc,
                                 audio: { running: !!audioProc, packetsPerSec: audioRate },
                                 mqtt: ha ? ha.status() : { enabled: false } });
       }
@@ -263,6 +323,9 @@ function startServer() {
       preset: v ? v.preset : null,
       fps: vizOn ? v.fps : 0,
       presets: presets || [],
+      titles: s && s.titles ? s.titles : "visualizer",
+      track: nowPlaying.title ? (nowPlaying.artist ? `${nowPlaying.artist} – ${nowPlaying.title}` : nowPlaying.title) : "",
+      track_playing: nowPlaying.playing,
       playlist: (playlist || []).map(p => ({ name: p.name, src: p.src, type: p.type })),
     };
   }
@@ -287,6 +350,9 @@ function startServer() {
     const info = { state: null, playlist: null, caps: null, seen: 0 };
     clients.set(socket, info);
     log(`page connected (origin ${req.headers.origin || "?"}), ${clients.size} total`);
+    // Current track, without a pop (it isn't a change).
+    socket.write(encodeFrame(Buffer.from(JSON.stringify({ type: "nowplaying", ...nowPlaying, changed: false }), "utf8")));
+    startNowPlaying();
 
     let buf = Buffer.alloc(0);
     socket.on("data", chunk => {
@@ -317,7 +383,7 @@ function startServer() {
     });
     const drop = () => {
       if (clients.delete(socket)) log(`page disconnected, ${clients.size} left`);
-      if (!clients.size) stopAudio();
+      if (!clients.size) { stopAudio(); stopNowPlaying(); }
       haUpdate();
     };
     socket.on("close", drop);
@@ -340,6 +406,7 @@ function validate(cmd) {
   if (cmd.action === "pick" && !Number.isInteger(cmd.index) && !String(cmd.name || "").trim())
     return "pick needs a name or an integer index";
   if (cmd.action === "night" && !["on", "off", "auto"].includes(cmd.mode)) return "night mode must be on, off or auto";
+  if (cmd.action === "titles" && !TITLE_MODES.includes(cmd.mode)) return `titles must be one of: ${TITLE_MODES.join(", ")}`;
   if (cmd.action === "visualizer") {
     cmd.mode = cmd.mode || "on";
     if (!VIZ_MODES.includes(cmd.mode)) return `visualizer mode must be one of: ${VIZ_MODES.join(", ")}`;

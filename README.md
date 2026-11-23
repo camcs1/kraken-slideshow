@@ -40,6 +40,8 @@ An optional local **bridge**, run by a small **tray app**, adds remote control
   (100 presets), driven by the PC's system audio.
 - Next / previous / random preset, or start on a preset by name.
 - Adjustable render size and frame cap, because CAM renders WebGL on the CPU.
+- **Track titles**: the song title pops up and fades when the track changes,
+  like MilkDrop, read from Windows' media controls.
 
 ---
 
@@ -128,6 +130,7 @@ to `http://127.0.0.1:27880/…`, or published over MQTT to `kraken/<pc name>/com
 | `visualizer on [preset]` | Start the MilkDrop visualizer |
 | `visualizer next` / `prev` / `random` | Change preset |
 | `visualizer res 256` / `fps 20` | Tune render size / frame cap |
+| `titles visualizer` / `always` / `off` / `show` | When the track title pops up on screen |
 | `reload` | Reload the Kraken page (picks up a new `index.html`) |
 
 ### Home Assistant

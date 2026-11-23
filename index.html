@@ -43,6 +43,28 @@
     image-rendering:auto;
   }
   .viz.on{display:block}
+  /* Track title, MilkDrop-style: pops in with an overshoot, holds, then drifts
+     larger and fades/blurs out. Sized in vmin so it fits the round LCD. */
+  .trackTitle{
+    position:absolute; left:50%; top:50%; z-index:15; width:76vmin;
+    transform:translate(-50%,-50%); text-align:center; pointer-events:none;
+    opacity:0; visibility:hidden;
+    font-family:"Segoe UI",system-ui,sans-serif; color:#fff; line-height:1.08;
+    text-shadow:0 0 2px #000, 0 0 10px rgba(0,0,0,.9), 0 0 28px rgba(120,190,255,.55);
+  }
+  .trackTitle .tt-title{font-weight:800; font-size:var(--tt-size,9vmin); letter-spacing:.01em;
+    overflow-wrap:anywhere; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden}
+  .trackTitle .tt-artist{margin-top:1.6vmin; font-weight:500; font-size:5.2vmin; opacity:.85;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .trackTitle.pop{visibility:visible; animation:ttPop var(--tt-time,5.6s) linear forwards}
+  @keyframes ttPop{
+    0%   {opacity:0; transform:translate(-50%,-50%) scale(.35); filter:blur(4px)}
+    5%   {opacity:1; transform:translate(-50%,-50%) scale(1.14); filter:blur(0)}
+    9%   {transform:translate(-50%,-50%) scale(.97)}
+    12%  {transform:translate(-50%,-50%) scale(1)}
+    68%  {opacity:1; transform:translate(-50%,-50%) scale(1.03); filter:blur(0)}
+    100% {opacity:0; transform:translate(-50%,-50%) scale(1.22); filter:blur(7px); visibility:hidden}
+  }
   .contain{object-fit:contain}
   .cover{object-fit:cover}
 
@@ -146,6 +168,7 @@
   <img id="imgEl" class="media contain" alt="media">
   <video id="vidEl" class="media contain" muted playsinline preload="auto"></video>
   <canvas id="vizCanvas" class="viz" width="192" height="192"></canvas>
+  <div id="trackTitle" class="trackTitle" aria-live="polite"><div class="tt-title"></div><div class="tt-artist"></div></div>
   <div id="nightOverlay" class="nightOverlay" aria-hidden="true"></div>
 </div>
 
@@ -1278,6 +1301,7 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
         src: vizOn ? null : (remoteSrc || (it && it.src) || null),
         paused, editMode, night: isNightModeActive(), nightOverride,
         view: vizOn ? null : lastVisual,
+        titles: titlesMode || "visualizer",
         visualizer: viz ? { on: vizOn, preset: viz.name, fps: viz.fps, maxFps: viz.maxFps, res: viz.res,
                             audio: vizOn && performance.now() - viz.audioAt < 1000,
                             presets: viz.keys.length, error: viz.error } : null
@@ -1423,6 +1447,7 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
         imgEl.classList.remove("show"); vidEl.classList.remove("show");
         viz.frames = 0; viz.fpsAt = performance.now();
         viz.raf = requestAnimationFrame(vizFrame);
+        if (nowPlaying && nowPlaying.playing) setTimeout(()=>popTitle(false), 600);   // say what's playing
       }
       reportState();
     }
@@ -1433,6 +1458,35 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
       cancelAnimationFrame(viz.raf);
       vizCanvas.classList.remove("on");
       paused = false;   // the command that stopped it decides what shows next
+    }
+
+    /* ---- Track title pop (now playing from the bridge) ----------------
+       titlesMode: "visualizer" (only over the visualizer), "always", "off".
+       var, not let: reportState() can run before this point. */
+    var titlesMode, nowPlaying = null;
+    try { titlesMode = localStorage.getItem("krakenTitles") || "visualizer"; } catch { titlesMode = "visualizer"; }
+    const ttEl = document.getElementById("trackTitle");
+    const ttTitle = ttEl.querySelector(".tt-title"), ttArtist = ttEl.querySelector(".tt-artist");
+
+    function titlesWanted(){
+      if (titlesMode === "off") return false;
+      if (isNightModeActive() && (o.nightAction || "black") === "black") return false;
+      return titlesMode === "always" || !!(viz && viz.on);
+    }
+    function popTitle(force){
+      const np = nowPlaying;
+      if (!np || !np.title || (!force && !titlesWanted())) return;
+      ttTitle.textContent = np.title;
+      ttArtist.textContent = np.artist || "";
+      // Long titles get smaller type so they stay inside the circle.
+      const n = np.title.length;
+      ttEl.style.setProperty("--tt-size", n > 48 ? "6vmin" : n > 30 ? "7.2vmin" : n > 16 ? "8.4vmin" : "10vmin");
+      ttEl.classList.remove("pop"); void ttEl.offsetWidth;   // restart the animation
+      ttEl.classList.add("pop");
+    }
+    function onNowPlaying(msg){
+      nowPlaying = { title: msg.title || "", artist: msg.artist || "", playing: !!msg.playing };
+      if (msg.changed && nowPlaying.playing) popTitle(false);
     }
 
     function clearHold(){
@@ -1525,6 +1579,12 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
         case "reload":
           location.reload();
           return;
+        case "titles":
+          if (cmd.mode === "show") { popTitle(true); break; }
+          titlesMode = cmd.mode;
+          try { localStorage.setItem("krakenTitles", titlesMode); } catch {}
+          if (titlesMode === "off") ttEl.classList.remove("pop");
+          break;
       }
       reportState();
     }
@@ -1547,7 +1607,10 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
         ws.binaryType = "arraybuffer";
         ws.onmessage = (ev)=>{
           if (typeof ev.data !== "string") { vizAudio(ev.data); return; }   // audio frame
-          try { handleRemoteCommand(JSON.parse(ev.data)); } catch {}
+          try {
+            const msg = JSON.parse(ev.data);
+            if (msg.type === "nowplaying") onNowPlaying(msg); else handleRemoteCommand(msg);
+          } catch {}
         };
         ws.onclose = ()=>{ if (bridgeSocket === ws) bridgeSocket = null; retry(); };
       }

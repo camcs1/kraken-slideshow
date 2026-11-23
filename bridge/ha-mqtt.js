@@ -81,6 +81,13 @@ module.exports = function startHaMqtt(opts) {
       state_topic: `${base}/state`,
       value_template: stateTpl("preset_option"),
     })]);
+    out.push(["select", "titles", common("select", "titles", "Track titles", {
+      icon: "mdi:music-note-eighth",
+      options: ["visualizer", "always", "off"],
+      command_topic: `${base}/titles/set`,
+      state_topic: `${base}/state`,
+      value_template: stateTpl("titles"),
+    })]);
     out.push(["text", "pick", common("text", "pick", "Pick item", {
       icon: "mdi:image-search",
       command_topic: `${base}/pick/set`,
@@ -104,6 +111,10 @@ module.exports = function startHaMqtt(opts) {
     })]);
     sensor("position", "Position", "mdi:counter", "position");
     sensor("showing", "Showing", "mdi:image", "name");
+    sensor("track", "Now playing", "mdi:music", "track", {
+      json_attributes_topic: `${base}/state`,
+      json_attributes_template: "{{ {'playing': value_json.track_playing} | tojson }}",
+    });
     sensor("fps", "Visualizer fps", "mdi:speedometer", "fps",
       { unit_of_measurement: "fps", state_class: "measurement", entity_category: "diagnostic" });
     out.push(["binary_sensor", "page", common("binary_sensor", "page", "Kraken page connected", {
@@ -153,6 +164,7 @@ module.exports = function startHaMqtt(opts) {
     if (topic === `${base}/command`) cmd = textToCommand(text);
     else if (topic === `${base}/visualizer/set`) cmd = { action: "visualizer", mode: text.toUpperCase() === "ON" ? "on" : "off" };
     else if (topic === `${base}/night/set`) cmd = { action: "night", mode: text.toLowerCase() };
+    else if (topic === `${base}/titles/set`) cmd = { action: "titles", mode: text.toLowerCase() };
     else if (topic === `${base}/preset/set`) { if (text && text !== NO_PRESET) cmd = { action: "visualizer", mode: "on", preset: text }; }
     else if (topic === `${base}/pick/set`) {
       if (!text) return;
@@ -250,7 +262,7 @@ module.exports = function startHaMqtt(opts) {
       log(`mqtt: connected to ${host}:${port} as ${username || "(anonymous)"}`);
       publish(`${base}/status`, "online", true);
       subscribe([`${base}/command`, `${base}/visualizer/set`, `${base}/night/set`,
-                 `${base}/preset/set`, `${base}/pick/set`, `${disc}/status`]);
+                 `${base}/preset/set`, `${base}/pick/set`, `${base}/titles/set`, `${disc}/status`]);
       publishDiscovery();
       publishState(true);
       pingTimer = setInterval(() => send(Buffer.from([0xc0, 0])), (KEEPALIVE - 5) * 1000);
