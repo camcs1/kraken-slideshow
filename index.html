@@ -61,27 +61,61 @@
   .cover{object-fit:cover}
 
   /* ===== Configure UI ===== */
-  .wrap{max-width:1200px;margin:24px auto;padding:0 16px}
-  h1{font-size:1.2rem;margin:0 0 14px}
+  #config{--accent:#6d5ef9;--accent2:#a594ff;--line:#2a2a2a;--muted:#a3a3a3;--warn:#fbbf24;--err:#f87171;--ok:#34d399}
+  .wrap{max-width:1100px;margin:0 auto;padding:0 16px 48px}
+  h1{font-size:1.15rem;margin:0}
+  .h1sub{font-weight:500;font-size:.95rem;color:var(--muted)}
+  #config h2{font-size:1rem;margin:0}
+  .topBar{background:#000;padding:14px 0 10px;z-index:50}
+  @media (min-height:560px){ .topBar{position:sticky;top:0;box-shadow:0 10px 12px -10px rgba(0,0,0,.95)} }
+  .topRow{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;flex-wrap:wrap}
+  .saveState{display:inline-flex;align-items:center;gap:8px;padding:4px 10px;border-radius:999px;background:#0f2a1f;color:#a7f3d0;font-size:.82rem;font-weight:700;white-space:nowrap}
+  .saveState::before{content:"";width:8px;height:8px;border-radius:999px;background:var(--ok)}
+  .saveState.dirty{background:#3a2405;color:#fde68a}
+  .saveState.dirty::before{background:var(--warn)}
+  .spacer{flex:1}
+  #config [hidden],.modalOverlay [hidden]{display:none !important}
   .grid{display:grid;gap:12px}
-  .cols-2{grid-template-columns:1fr 1fr}
+  .formGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));gap:4px 18px;align-items:start}
+  .formGrid .wide{grid-column:1/-1}
   .card{background:#121212;border-radius:12px;padding:16px;box-shadow:0 6px 20px rgba(0,0,0,.25);margin-bottom:14px}
-  label{display:block;margin:8px 0 6px;font-weight:600}
-  input[type="text"],input[type="number"],textarea,select{width:100%;min-width:0;padding:10px;border-radius:8px;border:1px solid #333;background:#0e0e0e;color:#eaeaea}
-  input[type="checkbox"]{transform:scale(1.2);margin-right:8px}
-  textarea{min-height:120px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
-  .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-  .actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
-  button{padding:10px 14px;border:0;border-radius:10px;cursor:pointer;background:#6d5ef9;color:#fff;font-weight:700}
-  .secondary{background:#2b2b2b}
-  .danger{background:#ef4444}
-  .muted{color:#aaa;font-size:.9rem}
+  .cardHead{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:4px}
+  .cardHead h2 .muted{font-weight:500;font-size:.85rem}
+  label{display:block;margin:10px 0 6px;font-weight:600}
+  input[type="text"],input[type="number"],input[type="time"],textarea,select{width:100%;min-width:0;padding:9px 10px;border-radius:8px;border:1px solid #333;background:#0e0e0e;color:#eaeaea;font:inherit}
+  input[type="checkbox"]{transform:scale(1.2);margin:0 8px 0 2px;accent-color:#6d5ef9;flex:none}
+  input[type="range"]{accent-color:#6d5ef9}
+  input[type="color"]{width:44px;height:38px;padding:2px;border:1px solid #333;border-radius:8px;background:#0e0e0e;flex:none;cursor:pointer}
+  input:disabled,select:disabled{opacity:.45}
+  textarea{min-height:120px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.85rem}
+  .row{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:4px 18px}
+  .actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  button{padding:9px 14px;border:0;border-radius:10px;cursor:pointer;background:#6d5ef9;color:#fff;font-weight:700;font:inherit;font-weight:700}
+  button:hover{filter:brightness(1.12)}
+  button:disabled{opacity:.4;cursor:default;filter:none}
+  .secondary{background:#2b2b2b;color:#eaeaea}
+  .danger{background:#b91c1c}
+  .ghostDanger:hover{background:#7f1d1d}
+  button.small{padding:6px 10px;font-size:.85rem}
+  #config :focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
+  .muted{color:var(--muted);font-size:.9rem}
+  .help{color:var(--muted);font-size:.82rem;margin-top:5px;line-height:1.35}
+  .help.err{color:var(--err)}
+  .help.ok{color:var(--ok)}
+  .hint{margin:4px 0 6px}
   .value{min-width:3ch;display:inline-block;text-align:right}
-  .optionLine{display:flex;align-items:center;gap:8px;margin-top:8px}
-  .optionLine label{margin:0;font-weight:600}
+  .optionLine,.check{display:flex;align-items:center;gap:6px;margin:12px 0 0;font-weight:600}
+  .optionLine label,.check{margin-top:12px}
+  .optionLine label{margin:0}
+  .inline{display:flex;gap:8px;align-items:center}
+  .inline input{flex:1}
+  #save.dirty{box-shadow:0 0 0 3px rgba(165,148,255,.45)}
+  #editModeBtn.live{background:#7f1d1d;color:#fff}
+  #editModeBtn.live::before{content:"\25CF  ";color:#fca5a5}
+  .editBanner{margin-top:10px;padding:8px 12px;border-radius:10px;background:#1e1b4b;border:1px solid #4338ca;font-size:.88rem;line-height:1.35}
   .nightPanel{border:1px solid #2a2a2a;background:#101010}
-  .nightPanelHeader{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px}
-  .nightPanelHeader h3{margin:0;font-size:1rem}
+  .nightPanelHeader{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:4px}
+  .nightPanelHeader h2{margin:0}
   .nightStatus{display:inline-flex;align-items:center;gap:8px;padding:5px 10px;border-radius:999px;background:#1f2937;color:#d1d5db;font-size:.85rem;font-weight:700}
   .nightStatus::before{content:"";width:8px;height:8px;border-radius:999px;background:#6b7280}
   .nightStatus.active{background:#312e81;color:#fff}
@@ -89,65 +123,108 @@
 
   /* Playlist list */
   .list{list-style:none;margin:0;padding:0}
-  .item{
-    display:grid;
-    grid-template-columns:auto auto minmax(260px,1.6fr) minmax(220px,1fr) auto auto;
-    gap:10px;align-items:center;
-    background:#0f0f0f;border:1px solid #272727;border-radius:10px;padding:10px;margin:8px 0;
-  }
-  .grab{cursor:grab;user-select:none;font-weight:700;padding:6px 8px;background:#1b1b1b;border-radius:8px}
-  .dragging{opacity:.6}
-  .preview{width:60px;height:40px;object-fit:cover;display:none;border-radius:6px}
-
-  .u,.opt{width:100%;min-width:0}
-  .rm{background:#ef4444}
-  .edit{background:#334155}
-  .selected{outline:2px solid #6d5ef9}
-  .listFooter{margin-top:12px;display:flex;justify-content:flex-start}
+  #playlistCard.dropTarget{box-shadow:0 0 0 2px var(--accent) inset}
+  .item{background:#0f0f0f;border:1px solid #272727;border-radius:10px;padding:8px;margin:8px 0}
+  .item:hover{border-color:#3a3a3a}
+  .item.selected{border-color:#6d5ef9;box-shadow:0 0 0 1px #6d5ef9}
+  .item.dragging{opacity:.45}
+  .rowMain{display:grid;grid-template-columns:22px 56px minmax(120px,1fr) minmax(180px,1.3fr) auto;
+    grid-template-areas:"grab thumb info url btns";gap:10px;align-items:center;cursor:pointer}
+  .grab{grid-area:grab;cursor:grab;user-select:none;color:#777;text-align:center;font-size:18px;line-height:1;padding:12px 0}
+  .grab:hover{color:#ddd}
+  .thumb{grid-area:thumb;width:56px;height:56px;border-radius:50%;overflow:hidden;background:#000;border:1px solid #333;display:flex;align-items:center;justify-content:center;position:relative}
+  .thumb img,.thumb video{width:100%;height:100%;object-fit:cover;display:block}
+  .thumb.broken::after{content:"!";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(127,29,29,.88);color:#fff;font-weight:800;font-size:20px}
+  .thumbIcon{color:#555;font-size:24px;line-height:1}
+  .rowInfo{grid-area:info;min-width:0}
+  .rowTitle{display:flex;align-items:center;gap:6px;min-width:0}
+  .rowName{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .rowName.unnamed{font-weight:600;color:#cfcfcf}
+  .typeBadge{flex:none;font-size:.66rem;font-weight:800;text-transform:uppercase;letter-spacing:.05em;padding:2px 6px;border-radius:6px;background:#1f2937;color:#cbd5e1}
+  .typeBadge[data-kind="video"]{background:#0c4a6e;color:#bae6fd}
+  .typeBadge[data-kind="gif"]{background:#3b0764;color:#e9d5ff}
+  .typeBadge[data-kind="empty"]{background:#3a2405;color:#fde68a}
+  .rowSummary{font-size:.82rem;color:var(--muted);margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .rowSummary.warn{color:var(--warn);white-space:normal}
+  .u{grid-area:url}
+  .rowBtns{grid-area:btns;display:flex;gap:4px}
+  .iconBtn{width:34px;height:34px;padding:0;border-radius:8px;background:#1f1f1f;color:#ddd;font-size:15px;line-height:1}
+  .iconBtn:hover{background:#2f2f2f}
+  .iconBtn.rm:hover{background:#7f1d1d}
+  .emptyState{border:1px dashed #333;border-radius:10px;padding:22px 16px;text-align:center;color:var(--muted);margin:8px 0}
+  .emptyState .actions{justify-content:center;margin-top:12px}
+  .listFooter{margin-top:10px;display:flex;justify-content:flex-start}
   @media (max-width:760px){
-    .item{grid-template-columns:auto auto 1fr auto;grid-template-areas:
-      "grab preview url edit"
-      "grab preview opt remove";}
-    .grab{grid-area:grab}
-    .preview{grid-area:preview}
-    .u{grid-area:url}
-    .opt{grid-area:opt}
-    .edit{grid-area:edit}
-    .rm{grid-area:remove}
+    .rowMain{grid-template-columns:18px 48px minmax(0,1fr) auto;
+      grid-template-areas:"grab thumb info btns" "url url url url";gap:8px}
+    .thumb{width:48px;height:48px}
+    .iconBtn{width:32px;height:32px}
   }
 
-  /* Inspector */
-  .inspector-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-  .badge{display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border-radius:999px;background:#1f2937;font-size:.85rem}
-  .segmented{display:flex;gap:8px;flex-wrap:wrap}
-  .segmented .segBtn{flex:1 1 0;padding:10px 12px;background:#222;color:#eaeaea;border:1px solid #333}
+  /* Inspector (opens inside the selected row) */
+  .inspector{margin-top:10px;padding-top:12px;border-top:1px solid #272727;cursor:auto}
+  .insLayout{display:grid;grid-template-columns:190px minmax(0,1fr);gap:18px;align-items:start}
+  .insPreviewCol{text-align:center}
+  .krPreview{width:180px;max-width:100%;aspect-ratio:1/1;border-radius:50%;overflow:hidden;position:relative;background:#000;border:2px solid #333;margin:0 auto}
+  .krPreview.empty::after{content:"No media";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#555;font-size:.85rem}
+  .pvMedia{position:absolute;inset:0;width:100%;height:100%;transform-origin:50% 50%}
+  .pvCaption{margin-top:6px;font-size:.78rem;color:var(--muted)}
+  .group{border:1px solid #242424;border-radius:10px;padding:4px 12px 12px;margin:12px 0 0;min-width:0}
+  .group:first-child{margin-top:0}
+  .group legend{padding:0 6px;font-weight:700;color:#c4b5fd;font-size:.76rem;text-transform:uppercase;letter-spacing:.06em}
+  .fieldGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:0 14px}
+  .insActions{margin-top:14px}
+  details.group summary{cursor:pointer;font-weight:700;color:#c4b5fd;font-size:.76rem;text-transform:uppercase;letter-spacing:.06em;padding:8px 0 4px}
+  details.group textarea{min-height:70px}
+  .invalid{border-color:var(--err)!important}
+  @media (max-width:600px){
+    .insLayout{grid-template-columns:1fr}
+    .krPreview{width:160px}
+  }
+  .segmented{display:flex;gap:6px;flex-wrap:wrap}
+  .segmented .segBtn{flex:1 1 0;min-width:0;padding:8px 10px;background:#222;color:#eaeaea;border:1px solid #333;font-weight:600}
   .segmented .segBtn.active{background:#6d5ef9;border-color:#6d5ef9;color:#fff}
-  .sliderHead{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:8px 0 6px}
+  .sliderHead{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:10px 0 6px}
   .sliderHead label{margin:0}
-  .overrideToggle{display:flex;align-items:center;gap:8px;font-weight:600;color:#ddd;white-space:nowrap}
-  .overrideToggle input{margin:0}
-  .sliderLine{display:grid;grid-template-columns:1fr 92px auto;gap:10px;align-items:center}
-  .sliderLine input[type="number"]{width:92px}
+  .overrideToggle{display:flex;align-items:center;gap:4px;font-weight:600;color:#ddd;white-space:nowrap;font-size:.85rem;margin:0;cursor:pointer}
+  .overrideToggle input{margin:0 4px 0 0}
+  .gHint{font-size:.78rem;color:var(--muted);font-weight:500}
+  .sliderLine{display:grid;grid-template-columns:minmax(0,1fr) 78px auto;gap:8px;align-items:center}
+  .sliderLine input[type="number"]{width:78px}
   input[type="range"]{width:100%}
   input[type="range"]:disabled{opacity:.35}
+  .globalCrop{display:grid;grid-template-columns:170px minmax(0,1fr);gap:18px;align-items:center}
+  @media (max-width:600px){ .globalCrop{grid-template-columns:1fr} }
 
-  /* ===== Modal Import ===== */
+  /* ===== Toast ===== */
+  .toast{position:fixed;left:50%;bottom:16px;transform:translate(-50%,20px);opacity:0;pointer-events:none;
+    max-width:min(560px,calc(100vw - 32px));background:#1f1f1f;border:1px solid #3a3a3a;color:#eee;border-radius:12px;
+    padding:10px 12px 10px 14px;display:flex;align-items:center;gap:12px;box-shadow:0 10px 30px rgba(0,0,0,.6);
+    transition:opacity .18s ease,transform .18s ease;z-index:10000;font-size:.9rem}
+  .toast.show{opacity:1;transform:translate(-50%,0);pointer-events:auto}
+  .toast.ok{border-color:#065f46}
+  .toast.error{border-color:#991b1b}
+  .toast .toastBtn{padding:6px 10px;font-size:.85rem;flex:none}
+
+  /* ===== Modals (import / export) ===== */
   .modalOverlay{
     position:fixed; inset:0; background:rgba(0,0,0,.6);
-    display:none; align-items:center; justify-content:center; z-index:9999;
+    display:none; align-items:center; justify-content:center; z-index:9999; padding:12px;
   }
   .modal{
-    width:min(920px, 92vw); background:#121212; color:#eaeaea;
+    width:min(920px, 100%); max-height:calc(100vh - 24px); overflow:auto; background:#121212; color:#eaeaea;
     border:1px solid #2a2a2a; border-radius:14px; padding:16px;
     box-shadow:0 10px 30px rgba(0,0,0,.5);
   }
   .modal h2{ margin:0 0 10px; font-size:1.1rem; }
   .modal textarea{
-    width:100%; min-height:260px; padding:10px; border-radius:10px;
+    width:100%; min-height:220px; padding:10px; border-radius:10px;
     border:1px solid #333; background:#0e0e0e; color:#eaeaea;
     font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
   }
   .modal .actions{ display:flex; gap:10px; justify-content:flex-end; margin-top:12px; }
+  .modeChoice{display:flex;gap:16px;flex-wrap:wrap;margin:10px 0 0}
+  .modeChoice label{display:flex;align-items:center;gap:6px;margin:0;font-weight:600}
   .btn{ padding:10px 14px; border:0; border-radius:10px; cursor:pointer; font-weight:700; }
   .btn.primary{ background:#6d5ef9; color:#fff; }
   .btn.secondary{ background:#2b2b2b; color:#eaeaea; }
@@ -166,235 +243,312 @@
 
 <!-- Configure -->
 <div id="config" class="wrap" style="display:none">
-  <h1>Kraken Media Slideshow — Configure</h1>
-
-  <div class="card">
+  <header class="topBar">
+    <div class="topRow">
+      <h1>Kraken Slideshow <span class="h1sub">Configure</span></h1>
+      <span id="saveState" class="saveState" role="status" aria-live="polite">All changes saved</span>
+    </div>
     <div class="actions">
-      <button id="add">Add item</button>
-      <button id="importTxt" class="secondary">Import from text</button>
-      <button id="exportTxt" class="secondary">Export to text</button>
-      <span style="flex:1"></span>
-      <button id="editModeBtn" class="secondary" title="Toggle edit mode">Enter Edit Mode</button>
-      <button id="save">Save</button>
-      <button id="load" class="secondary">Load</button>
-      <button id="clear" class="secondary">Clear</button>
+      <button id="save" type="button" title="Save to this PC so the Kraken uses it (Ctrl+S)">Save</button>
+      <button id="editModeBtn" type="button" class="secondary" aria-pressed="false" title="Show the selected item on the Kraken while you edit it">Edit Mode</button>
+      <span class="spacer"></span>
+      <button id="importTxt" class="secondary" type="button" title="Paste a list of URLs">Import</button>
+      <button id="exportTxt" class="secondary" type="button" title="Copy the playlist as text">Export</button>
+      <button id="load" class="secondary" type="button" title="Discard unsaved changes and reload what is saved">Revert</button>
+      <button id="clear" class="secondary ghostDanger" type="button" title="Empty the playlist and reset all settings (not saved until you press Save)">Clear all</button>
     </div>
-    <div class="muted">Drag the ☰ handle to reorder. Select a row and tweak settings in the inspector. In <b>Edit Mode</b>, the Kraken shows the selected item live and updates on every change. Press <b>Save</b> to exit Edit Mode and resume the slideshow.</div>
-    <ul id="list" class="list"></ul>
-    <div class="listFooter"><button id="addBottom" class="secondary">Add item</button></div>
-  </div>
+    <div id="editBanner" class="editBanner" hidden></div>
+  </header>
 
-  <!-- Per-item Inspector -->
-  <div class="card" id="inspector" style="display:none">
-    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:8px">
-      <div>
-        <div class="badge"><span id="insType">?</span> <span style="opacity:.7">selected item</span></div>
-        <div class="muted" id="insUrl" style="margin-top:6px;word-break:break-all"></div>
+  <section class="card" id="playlistCard" aria-labelledby="playlistTitle">
+    <div class="cardHead">
+      <h2 id="playlistTitle">Playlist <span id="listCount" class="muted"></span></h2>
+      <button id="add" type="button">+ Add item</button>
+    </div>
+    <p class="muted hint">Click an item to set its name, timing, crop and schedule. Drag &#8942;&#8942; or use &uarr; &darr; (Alt+&uarr;/&darr; on a focused row) to reorder. You can also drop image links onto this list.</p>
+    <ul id="list" class="list" aria-label="Playlist items"></ul>
+    <div id="emptyState" class="emptyState" hidden>
+      <div><b>The playlist is empty.</b></div>
+      <div>Add an image, GIF or video URL (png, jpg, gif, webp, mp4, webm), or import a list.</div>
+      <div class="actions"><button id="emptyAdd" type="button">+ Add item</button><button id="emptyImport" type="button" class="secondary">Import list</button></div>
+    </div>
+    <div class="listFooter"><button id="addBottom" class="secondary" type="button">+ Add item</button></div>
+  </section>
+
+  <!-- Per-item inspector: lives here while hidden, moves into the selected row -->
+  <div id="inspectorHome" hidden>
+    <div class="inspector" id="inspector">
+      <div class="insLayout">
+        <div class="insPreviewCol">
+          <div class="krPreview" id="i_preview" role="img" aria-label="Preview of this item on the round Kraken screen"></div>
+          <div class="pvCaption">Kraken screen preview</div>
+        </div>
+        <div class="insFields">
+          <fieldset class="group">
+            <legend>Item</legend>
+            <label for="i_name">Name</label>
+            <input id="i_name" type="text" placeholder="Optional, e.g. Front Door" autocomplete="off" spellcheck="false">
+            <div class="help">Lets you pick this item by name from Home Assistant or the bridge.</div>
+          </fieldset>
+
+          <fieldset class="group">
+            <legend>Timing</legend>
+            <div class="forImage">
+              <label for="i_seconds">Show for (seconds)</label>
+              <input id="i_seconds" type="number" min="0" step="1" inputmode="numeric">
+              <div class="help" id="i_seconds_help"></div>
+            </div>
+            <div class="forVideo fieldGrid">
+              <div>
+                <label id="i_loop_label">Playback</label>
+                <input id="i_loop" type="hidden" value="inherit">
+                <div class="segmented" data-bound="i_loop" role="group" aria-labelledby="i_loop_label">
+                  <button type="button" class="segBtn" data-value="inherit">Default</button>
+                  <button type="button" class="segBtn" data-value="true">Loop</button>
+                  <button type="button" class="segBtn" data-value="false">Play once</button>
+                </div>
+              </div>
+              <div>
+                <label for="i_maxSeconds">Stop after (seconds)</label>
+                <input id="i_maxSeconds" type="number" min="0" step="1" inputmode="numeric" placeholder="Full length">
+              </div>
+            </div>
+            <div class="forVideo help" id="i_video_help"></div>
+          </fieldset>
+
+          <fieldset class="group">
+            <legend>Fit and crop</legend>
+            <label id="i_fit_label">Fit</label>
+            <input id="i_fit" type="hidden" value="inherit">
+            <div class="segmented" data-bound="i_fit" role="group" aria-labelledby="i_fit_label">
+              <button type="button" class="segBtn" data-value="inherit">Global</button>
+              <button type="button" class="segBtn" data-value="contain">Contain</button>
+              <button type="button" class="segBtn" data-value="cover">Cover</button>
+            </div>
+            <div class="help" id="i_fit_help"></div>
+            <div class="fieldGrid">
+              <div>
+                <div class="sliderHead">
+                  <label for="i_scale">Zoom <span class="gHint" id="i_scale_g"></span></label>
+                  <label class="overrideToggle"><input id="i_scale_enabled" type="checkbox"> Custom</label>
+                </div>
+                <div class="sliderLine">
+                  <input id="i_scale" type="range" min="10" max="500" value="100">
+                  <input id="i_scale_num" type="number" min="10" max="500" step="1" value="100" aria-label="Zoom percent">
+                  <span>%</span>
+                </div>
+              </div>
+              <div>
+                <div class="sliderHead">
+                  <label for="i_rotDeg">Rotation <span class="gHint" id="i_rotDeg_g"></span></label>
+                  <label class="overrideToggle"><input id="i_rotDeg_enabled" type="checkbox"> Custom</label>
+                </div>
+                <div class="sliderLine">
+                  <input id="i_rotDeg" type="range" min="-180" max="180" value="0">
+                  <input id="i_rotDeg_num" type="number" min="-180" max="180" step="1" value="0" aria-label="Rotation degrees">
+                  <span>&deg;</span>
+                </div>
+              </div>
+              <div>
+                <div class="sliderHead">
+                  <label for="i_txPct">Offset X <span class="gHint" id="i_txPct_g"></span></label>
+                  <label class="overrideToggle"><input id="i_txPct_enabled" type="checkbox"> Custom</label>
+                </div>
+                <div class="sliderLine">
+                  <input id="i_txPct" type="range" min="-100" max="100" value="0">
+                  <input id="i_txPct_num" type="number" min="-100" max="100" step="1" value="0" aria-label="Offset X percent">
+                  <span>%</span>
+                </div>
+              </div>
+              <div>
+                <div class="sliderHead">
+                  <label for="i_tyPct">Offset Y <span class="gHint" id="i_tyPct_g"></span></label>
+                  <label class="overrideToggle"><input id="i_tyPct_enabled" type="checkbox"> Custom</label>
+                </div>
+                <div class="sliderLine">
+                  <input id="i_tyPct" type="range" min="-100" max="100" value="0">
+                  <input id="i_tyPct_num" type="number" min="-100" max="100" step="1" value="0" aria-label="Offset Y percent">
+                  <span>%</span>
+                </div>
+              </div>
+            </div>
+            <div class="help">Unticked settings follow the global crop below.</div>
+          </fieldset>
+
+          <fieldset class="group">
+            <legend>Schedule</legend>
+            <label for="i_at">Also show every day at</label>
+            <div class="inline">
+              <input id="i_at" type="time" step="60" value="">
+              <button id="i_atClear" type="button" class="secondary small">Clear</button>
+            </div>
+            <label class="check"><input id="i_atOnly" type="checkbox"> Only at this time (keep it out of the normal rotation)</label>
+            <div class="help">Uses the Kraken PC's local time.</div>
+          </fieldset>
+
+          <details class="group" id="i_jsonBox">
+            <summary>Options as JSON</summary>
+            <textarea id="i_json" spellcheck="false" rows="3" aria-describedby="i_json_msg" placeholder='{"seconds":45}'></textarea>
+            <div id="i_json_msg" class="help">Edit by hand if you prefer. Applied when you leave the box (or Ctrl+Enter).</div>
+          </details>
+        </div>
       </div>
-      <div class="actions">
-        <button id="applyItem">Apply to item</button>
-        <button id="clearItem" class="danger">Clear item overrides</button>
+      <div class="insActions actions">
+        <button id="insDone" type="button">Done</button>
+        <button id="insDup" type="button" class="secondary">Duplicate</button>
+        <button id="clearItem" type="button" class="secondary" title="Clear timing, crop and schedule for this item (keeps its name)">Reset options</button>
+        <span class="spacer"></span>
+        <button id="insRemove" type="button" class="danger">Remove</button>
       </div>
     </div>
-
-    <div class="inspector-grid">
-      <div>
-        <label>Per-image duration (seconds)</label>
-        <input id="i_seconds" type="number" min="0" value="0">
-        <div class="muted">For images/GIFs; 0 = use global interval.</div>
-      </div>
-      <div>
-        <label>Video: loop</label>
-        <input id="i_loop" type="hidden" value="inherit">
-        <div class="segmented" data-bound="i_loop">
-          <button type="button" class="segBtn" data-value="inherit">Inherit</button>
-          <button type="button" class="segBtn" data-value="true">Loop</button>
-          <button type="button" class="segBtn" data-value="false">No loop</button>
-        </div>
-      </div>
-      <div>
-        <label>Video: max seconds (0 = no cap)</label>
-        <input id="i_maxSeconds" type="number" min="0" value="0">
-      </div>
-      <div>
-        <label>Override fit</label>
-        <input id="i_fit" type="hidden" value="inherit">
-        <div class="segmented" data-bound="i_fit">
-          <button type="button" class="segBtn" data-value="inherit">Inherit</button>
-          <button type="button" class="segBtn" data-value="contain">Contain</button>
-          <button type="button" class="segBtn" data-value="cover">Cover</button>
-        </div>
-      </div>
-      <div>
-        <label>Show at time (HH:MM)</label>
-        <input id="i_at" type="time" step="60" value="">
-        <div class="muted">24h format; optional.</div>
-      </div>
-      <div style="grid-column:1/-1;display:flex;align-items:center;margin-top:4px">
-        <input id="i_atOnly" type="checkbox">
-        <label for="i_atOnly" style="margin:0; font-weight:600">Only at scheduled time</label>
-      </div>
-    </div>
-
-    <div class="inspector-grid" style="margin-top:12px">
-      <div>
-        <div class="sliderHead">
-          <label>Zoom</label>
-          <span class="overrideToggle"><input id="i_scale_enabled" type="checkbox"> Override</span>
-        </div>
-        <div class="sliderLine">
-          <input id="i_scale" type="range" min="10" max="500" value="100">
-          <input id="i_scale_num" type="number" min="10" max="500" step="1" value="100">
-          <span>%</span>
-        </div>
-        <div class="muted">Off = inherit global zoom.</div>
-      </div>
-      <div>
-        <div class="sliderHead">
-          <label>Rotation</label>
-          <span class="overrideToggle"><input id="i_rotDeg_enabled" type="checkbox"> Override</span>
-        </div>
-        <div class="sliderLine">
-          <input id="i_rotDeg" type="range" min="-180" max="180" value="0">
-          <input id="i_rotDeg_num" type="number" min="-180" max="180" step="1" value="0">
-          <span>°</span>
-        </div>
-      </div>
-      <div>
-        <div class="sliderHead">
-          <label>Offset X</label>
-          <span class="overrideToggle"><input id="i_txPct_enabled" type="checkbox"> Override</span>
-        </div>
-        <div class="sliderLine">
-          <input id="i_txPct" type="range" min="-100" max="100" value="0">
-          <input id="i_txPct_num" type="number" min="-100" max="100" step="1" value="0">
-          <span>%</span>
-        </div>
-      </div>
-      <div>
-        <div class="sliderHead">
-          <label>Offset Y</label>
-          <span class="overrideToggle"><input id="i_tyPct_enabled" type="checkbox"> Override</span>
-        </div>
-        <div class="sliderLine">
-          <input id="i_tyPct" type="range" min="-100" max="100" value="0">
-          <input id="i_tyPct_num" type="number" min="-100" max="100" step="1" value="0">
-          <span>%</span>
-        </div>
-      </div>
-    </div>
-
   </div>
 
   <!-- Global Options -->
-  <div class="card grid cols-2">
-    <div>
-      <label>Image interval (seconds)</label>
-      <input id="interval" type="number" min="1" value="30">
-    </div>
-    <div>
-      <label>Cap video length (seconds, 0 = no cap)</label>
-      <input id="videoMax" type="number" min="0" value="0">
-    </div>
-    <div>
-      <label>Object fit</label>
-      <select id="fit">
-        <option value="contain">contain</option>
-        <option value="cover">cover</option>
-      </select>
-    </div>
-    <div>
-      <label>Background</label>
-      <input id="bg" type="text" value="#000000" placeholder="#000000 or black">
-    </div>
-    <div class="optionLine">
-      <input id="shuffleGifs" type="checkbox">
-      <label for="shuffleGifs">Scramble GIF order</label>
-    </div>
-  </div>
-
-  <div class="card nightPanel">
-    <div class="nightPanelHeader">
-      <h3>Night mode</h3>
-      <div id="nightStatus" class="nightStatus">Night mode inactive</div>
-    </div>
-    <div class="grid cols-2">
-      <div class="optionLine">
-        <input id="nightEnabled" type="checkbox">
-        <label for="nightEnabled">Enable night mode</label>
-      </div>
-      <div class="muted" style="align-self:center">Editor preview bypasses the black/dim overlay. This status shows whether normal playback would be in night mode now.</div>
+  <section class="card" aria-labelledby="playbackTitle">
+    <div class="cardHead"><h2 id="playbackTitle">Playback</h2></div>
+    <div class="formGrid">
       <div>
-        <label>Night start</label>
-        <input id="nightStart" type="time" step="60" value="23:00">
+        <label for="interval">Show each image for (seconds)</label>
+        <input id="interval" type="number" min="1" value="30" inputmode="numeric">
+        <div class="help">Items with their own time override this. Looping videos also loop for this long.</div>
       </div>
       <div>
-        <label>Night end</label>
-        <input id="nightEnd" type="time" step="60" value="07:00">
+        <label for="videoMax">Max video length (seconds)</label>
+        <input id="videoMax" type="number" min="0" value="0" inputmode="numeric">
+        <div class="help">0 = play videos to the end. When set, it wins over each item's own limit.</div>
       </div>
       <div>
-        <label>Night action</label>
-        <select id="nightAction">
-          <option value="black">Black screen</option>
-          <option value="dim">Dim screen</option>
+        <label for="fit">Fit</label>
+        <select id="fit">
+          <option value="contain">Contain (whole picture)</option>
+          <option value="cover">Cover (fill, crop edges)</option>
         </select>
       </div>
       <div>
-        <label>Night dim amount</label>
+        <label for="bg">Background</label>
+        <div class="inline">
+          <input id="bgPicker" type="color" value="#000000" aria-label="Pick background colour">
+          <input id="bg" type="text" value="#000000" placeholder="#000000 or black" spellcheck="false">
+        </div>
+        <div class="help" id="bgHelp">Shows around pictures that don't fill the screen.</div>
+      </div>
+      <div class="wide">
+        <div class="optionLine">
+          <input id="shuffleGifs" type="checkbox">
+          <label for="shuffleGifs">Shuffle GIF order</label>
+        </div>
+        <div class="help">GIFs swap places randomly each round; other items keep their spots.</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card nightPanel" aria-labelledby="nightTitle">
+    <div class="nightPanelHeader">
+      <h2 id="nightTitle">Night mode</h2>
+      <div id="nightStatus" class="nightStatus">Night mode inactive</div>
+    </div>
+    <div class="optionLine">
+      <input id="nightEnabled" type="checkbox">
+      <label for="nightEnabled">Enable night mode</label>
+    </div>
+    <div class="formGrid">
+      <div>
+        <label for="nightStart">Starts at</label>
+        <input id="nightStart" type="time" step="60" value="23:00">
+      </div>
+      <div>
+        <label for="nightEnd">Ends at</label>
+        <input id="nightEnd" type="time" step="60" value="07:00">
+      </div>
+      <div>
+        <label for="nightAction">At night</label>
+        <select id="nightAction">
+          <option value="black">Turn the screen black</option>
+          <option value="dim">Dim the screen</option>
+        </select>
+      </div>
+      <div>
+        <label for="nightDim">Dim amount</label>
         <div class="sliderLine">
           <input id="nightDim" type="range" min="10" max="95" value="70">
-          <input id="nightDimNum" type="number" min="10" max="95" step="1" value="70">
+          <input id="nightDimNum" type="number" min="10" max="95" step="1" value="70" aria-label="Dim amount percent">
           <span>%</span>
         </div>
-        <div class="muted">Dim: <span id="nightDimVal" class="value">70</span>% black overlay.</div>
+        <div class="help">Dim: <span id="nightDimVal" class="value">70</span>% black overlay.</div>
       </div>
-      <div class="muted" style="grid-column:1/-1">Uses the local time of the device/browser running the Kraken display. Overnight ranges are supported, for example 23:00 to 07:00.</div>
     </div>
-  </div>
+    <div class="help">Uses the Kraken PC's local time. Overnight ranges work, for example 23:00 to 07:00. Edit Mode ignores night mode so you can see what you're editing.</div>
+  </section>
 
-  <div class="card">
-    <h3 style="margin:0 0 10px">Global crop and alignment</h3>
-    <div class="row">
-      <div>
-        <label>Zoom</label>
-        <input id="scale" type="range" min="100" max="300" value="100">
-        <div class="muted">Scale: <span id="scaleVal" class="value">100</span>%</div>
+  <section class="card" aria-labelledby="cropTitle">
+    <div class="cardHead">
+      <h2 id="cropTitle">Global crop and alignment</h2>
+      <button id="cropReset" type="button" class="secondary small">Reset</button>
+    </div>
+    <div class="globalCrop">
+      <div class="insPreviewCol">
+        <div class="krPreview" id="g_preview" style="width:150px" role="img" aria-label="Preview of the global crop"></div>
+        <div class="pvCaption" id="g_previewLabel"></div>
       </div>
       <div>
-        <label>Rotation (deg)</label>
-        <input id="rot" type="range" min="-180" max="180" value="0">
-        <div class="muted"><span id="rotVal" class="value">0</span>°</div>
+        <div class="row">
+          <div>
+            <label for="scale">Zoom: <span id="scaleVal" class="value">100</span>%</label>
+            <input id="scale" type="range" min="10" max="500" value="100">
+          </div>
+          <div>
+            <label for="rot">Rotation: <span id="rotVal" class="value">0</span>&deg;</label>
+            <input id="rot" type="range" min="-180" max="180" value="0">
+          </div>
+          <div>
+            <label for="tx">Offset X: <span id="txVal" class="value">0</span>%</label>
+            <input id="tx" type="range" min="-100" max="100" value="0">
+          </div>
+          <div>
+            <label for="ty">Offset Y: <span id="tyVal" class="value">0</span>%</label>
+            <input id="ty" type="range" min="-100" max="100" value="0">
+          </div>
+        </div>
+        <div class="help">Applies to every item that doesn't set its own crop.</div>
       </div>
     </div>
-    <div class="row" style="margin-top:12px">
-      <div>
-        <label>Offset X (%)</label>
-        <input id="tx" type="range" min="-50" max="50" value="0">
-        <div class="muted"><span id="txVal" class="value">0</span>%</div>
-      </div>
-      <div>
-        <label>Offset Y (%)</label>
-        <input id="ty" type="range" min="-50" max="50" value="0">
-        <div class="muted"><span id="tyVal" class="value">0</span>%</div>
-      </div>
-    </div>
-  </div>
+  </section>
 </div>
 
-<!-- ===== Modal Import dialog ===== -->
+<!-- ===== Import dialog ===== -->
 <div id="importOverlay" class="modalOverlay" role="dialog" aria-modal="true" aria-labelledby="importTitle">
   <div class="modal">
     <h2 id="importTitle">Import playlist from text</h2>
-    <p class="muted">Paste one item per line. Format: <code>URL</code> or <code>URL {"{...json...}"}</code></p>
-    <textarea id="importTextarea" placeholder="https://example.com/a.webp
+    <p class="muted">One item per line: <code>URL</code> or <code>URL {"...json options..."}</code>. Lines starting with # are skipped.</p>
+    <textarea id="importTextarea" spellcheck="false" placeholder="https://example.com/a.webp
 https://example.com/clip.mp4 {&quot;loop&quot;:true, &quot;maxSeconds&quot;:8}
-https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
+https://example.com/door.jpg {&quot;name&quot;:&quot;Front Door&quot;, &quot;seconds&quot;:45}"></textarea>
+    <div id="importSummary" class="help" aria-live="polite"></div>
+    <div class="modeChoice" role="radiogroup" aria-label="Import mode">
+      <label><input type="radio" name="importMode" value="append" checked> Add to the end</label>
+      <label><input type="radio" name="importMode" value="replace"> Replace the playlist</label>
+    </div>
     <div class="actions">
-      <button id="importCancel" class="btn secondary">Cancel</button>
-      <button id="importDo" class="btn primary">Import</button>
+      <button id="importCancel" type="button" class="btn secondary">Cancel</button>
+      <button id="importDo" type="button" class="btn primary">Import</button>
     </div>
   </div>
 </div>
+
+<!-- ===== Export dialog ===== -->
+<div id="exportOverlay" class="modalOverlay" role="dialog" aria-modal="true" aria-labelledby="exportTitle">
+  <div class="modal">
+    <h2 id="exportTitle">Export playlist</h2>
+    <p class="muted" id="exportInfo"></p>
+    <textarea id="exportTextarea" spellcheck="false" readonly></textarea>
+    <div class="actions">
+      <button id="exportClose" type="button" class="btn secondary">Close</button>
+      <button id="exportCopy" type="button" class="btn primary">Copy to clipboard</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
 
 <script>
   /* Storage keys + channel */
@@ -423,8 +577,12 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
     if (optStr) { try { Object.assign(it, JSON.parse(optStr)); } catch {} }
     return it;
   }
+  // Keys the editor manages itself; anything else in an item (future or hand-written
+  // options) is passed through untouched so a load/save round trip never drops it.
+  const OPT_MANAGED = ["src","type","name","seconds","loop","maxSeconds","fit","at","only","scale","rotDeg","txPct","tyPct"];
   function itemToOptString(it){
     const o = {};
+    if (it.name !== undefined && it.name !== null && String(it.name).trim() !== "") o.name = it.name;
     if (it.type === "image" && it.seconds) o.seconds = it.seconds;
     if (it.type === "video"){
       if (typeof it.loop === "boolean") o.loop = it.loop;
@@ -435,6 +593,9 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
     if (it.only) o.only = true;
     ["scale","rotDeg","txPct","tyPct"].forEach(k=>{
       if (it[k] !== undefined && it[k] !== null && it[k] !== "") o[k] = it[k];
+    });
+    Object.keys(it).forEach(k=>{
+      if (!OPT_MANAGED.includes(k) && it[k] !== undefined) o[k] = it[k];
     });
     return Object.keys(o).length ? JSON.stringify(o) : "";
   }
@@ -486,105 +647,310 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
      CONFIGURE MODE
   ============================================================ */
   if (!isKraken) {
-    const listEl = document.getElementById("list");
+    const $ = (id)=>document.getElementById(id);
+    const configEl = $("config");
+    const listEl = $("list");
     let selectedLi = null;
     let editMode = false;
+    let savedSnapshot = "";
+
+    /* ---- Small UI helpers ---- */
+    const toastEl = $("toast");
+    let toastTimer = null;
+    function hideToast(){ toastEl.classList.remove("show"); }
+    function toast(msg, opts={}){
+      toastEl.innerHTML = "";
+      const span = document.createElement("span");
+      span.textContent = msg;
+      toastEl.appendChild(span);
+      if (opts.action){
+        const b = document.createElement("button");
+        b.type = "button"; b.className = "toastBtn"; b.textContent = opts.action;
+        b.addEventListener("click", ()=>{ hideToast(); opts.onAction(); });
+        toastEl.appendChild(b);
+      }
+      toastEl.className = "toast show" + (opts.kind ? " " + opts.kind : "");
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(hideToast, opts.action ? 8000 : 4000);
+    }
+    const plural = (n, word)=> n + " " + word + (n === 1 ? "" : "s");
+    function isGifUrl(url){ return /\.gif(\?.*)?$/i.test(url || ""); }
+    function typeLabel(url){ return inferType(url) === "video" ? "Video" : isGifUrl(url) ? "GIF" : "Image"; }
+    function fileLabel(url){
+      if (!url) return "";
+      try {
+        const u = new URL(url, location.href);
+        const last = u.pathname.split("/").filter(Boolean).pop();
+        return last ? decodeURIComponent(last) : u.hostname || url;
+      } catch { return url; }
+    }
+    function tryParseOpts(str){
+      if (!str || !str.trim()) return { ok:true, value:{} };
+      try {
+        const v = JSON.parse(str);
+        if (v && typeof v === "object" && !Array.isArray(v)) return { ok:true, value:v };
+        return { ok:false, error:'Options must be a JSON object, like {"seconds":45}.' };
+      } catch (e) { return { ok:false, error:e.message }; }
+    }
+    function padTime(t){ return /^\d:\d\d$/.test(t || "") ? "0" + t : (t || ""); }
+    function rowUrl(li){ return li.querySelector(".u").value.trim(); }
+    function rowOpt(li){ return li.querySelector(".opt").value.trim(); }
+    function rowItem(li){ return parseItem(rowUrl(li), rowOpt(li)); }
+    function rows(){ return [...listEl.querySelectorAll(".item")]; }
+    function prevRow(li){ let p = li.previousElementSibling; while (p && !p.classList.contains("item")) p = p.previousElementSibling; return p; }
+    function nextRow(li){ let n = li.nextElementSibling; while (n && !n.classList.contains("item")) n = n.nextElementSibling; return n; }
+
+    /* ---- Round Kraken-screen preview (mirrors the renderer's transform) ---- */
+    function renderPreview(box, it, o){
+      const src = it && it.src ? it.src : "";
+      box.style.background = o.bg || "#000";
+      let el = box.querySelector(".pvMedia");
+      const want = !src ? null : (inferType(src) === "video" ? "VIDEO" : "IMG");
+      if (!want){ if (el) el.remove(); box.classList.add("empty"); return; }
+      box.classList.remove("empty");
+      if (!el || el.tagName !== want){
+        if (el) el.remove();
+        el = document.createElement(want.toLowerCase());
+        el.className = "pvMedia";
+        if (want === "VIDEO"){ el.muted = true; el.loop = true; el.autoplay = true; el.playsInline = true; }
+        else el.alt = "";
+        box.prepend(el);
+      }
+      if (el.getAttribute("src") !== src){
+        el.src = src;
+        if (want === "VIDEO"){ const p = el.play(); if (p && p.catch) p.catch(()=>{}); }
+      }
+      el.style.objectFit = o.fit === "cover" ? "cover" : "contain";
+      el.style.transform = `translate(${Number(o.txPct)||0}%, ${Number(o.tyPct)||0}%) scale(${Number(o.scale)||1}) rotate(${Number(o.rotDeg)||0}deg)`;
+    }
 
     /* ---- Playlist rows ---- */
+    function summaryParts(it){
+      const p = [];
+      if (it.type === "video"){
+        if (it.loop === true) p.push("loop");
+        else if (it.loop === false) p.push("play once");
+        if (it.maxSeconds) p.push("stop after " + it.maxSeconds + " s");
+      } else if (it.seconds) p.push(it.seconds + " s");
+      if (it.fit === "contain" || it.fit === "cover") p.push(it.fit);
+      if (it.scale != null && it.scale !== "") p.push("zoom " + Math.round(it.scale * 100) + "%");
+      if (it.rotDeg != null && it.rotDeg !== "") p.push(it.rotDeg + "\u00B0");
+      if ((it.txPct != null && it.txPct !== "") || (it.tyPct != null && it.tyPct !== "")) p.push("offset");
+      if (it.at) p.push((it.only ? "only at " : "also at ") + it.at);
+      return p;
+    }
+    function refreshThumb(li, url){
+      const box = li.querySelector(".thumb");
+      if (box.dataset.src === url) return;
+      box.dataset.src = url;
+      box.innerHTML = "";
+      box.classList.remove("broken");
+      box.title = "";
+      if (!url){ box.innerHTML = '<span class="thumbIcon">+</span>'; return; }
+      const markBroken = ()=>{ box.classList.add("broken"); box.title = "Couldn't load this URL here. Check the link."; };
+      let el;
+      if (inferType(url) === "video"){
+        el = document.createElement("video");
+        el.muted = true; el.preload = "metadata"; el.playsInline = true;
+        el.src = url.includes("#") ? url : url + "#t=0.5";
+      } else {
+        el = document.createElement("img");
+        el.alt = ""; el.loading = "lazy"; el.src = url;
+      }
+      el.addEventListener("error", markBroken);
+      box.appendChild(el);
+    }
+    function refreshRow(li, skipThumb=false){
+      const url = rowUrl(li);
+      const raw = rowOpt(li);
+      const parsed = tryParseOpts(raw);
+      const it = parseItem(url, parsed.ok ? raw : "");
+      const badge = li.querySelector(".typeBadge");
+      badge.textContent = url ? typeLabel(url) : "Empty";
+      badge.dataset.kind = url ? typeLabel(url).toLowerCase() : "empty";
+      const nameEl = li.querySelector(".rowName");
+      const hasName = it.name != null && String(it.name).trim() !== "";
+      nameEl.textContent = hasName ? String(it.name) : (url ? fileLabel(url) : "New item");
+      nameEl.classList.toggle("unnamed", !hasName);
+      nameEl.title = url;
+      const sum = li.querySelector(".rowSummary");
+      if (!url){
+        sum.textContent = "Paste an image or video URL. Empty rows aren't saved.";
+        sum.className = "rowSummary warn";
+      } else if (!parsed.ok){
+        sum.textContent = "Options JSON is invalid and will be ignored. Open the item to fix it.";
+        sum.className = "rowSummary warn";
+      } else {
+        const parts = summaryParts(it);
+        sum.textContent = parts.length ? parts.join(" \u00B7 ") : "Default settings";
+        sum.className = "rowSummary";
+      }
+      if (!skipThumb) refreshThumb(li, url);
+    }
+
     function createItem(url="", opt=""){
       const li = document.createElement("li");
       li.className = "item";
-      li.draggable = true;
+      li.tabIndex = 0;
+      li.setAttribute("aria-expanded", "false");
       li.innerHTML = `
-        <div class="grab" title="Drag to reorder">☰</div>
-        <img class="preview" loading="lazy" alt="">
-        <input class="u" type="text" placeholder="https://example.com/image.webp or video.mp4" value="${url.replace(/"/g,'&quot;')}">
-        <input class="opt" type="text" placeholder='Optional JSON (e.g. {"seconds":45})' value="${opt.replace(/"/g,'&quot;')}">
-        <button class="edit">Edit</button>
-        <button class="rm">Remove</button>
-      `;
-
+        <div class="rowMain">
+          <div class="grab" title="Drag to reorder" aria-hidden="true">&#8942;&#8942;</div>
+          <div class="thumb"></div>
+          <div class="rowInfo">
+            <div class="rowTitle"><span class="typeBadge"></span><span class="rowName"></span></div>
+            <div class="rowSummary"></div>
+          </div>
+          <input class="u" type="text" spellcheck="false" placeholder="https://example.com/image.webp or clip.mp4" aria-label="Media URL">
+          <div class="rowBtns">
+            <button type="button" class="iconBtn up" title="Move up" aria-label="Move up">&uarr;</button>
+            <button type="button" class="iconBtn down" title="Move down" aria-label="Move down">&darr;</button>
+            <button type="button" class="iconBtn rm" title="Remove" aria-label="Remove item">&#10005;</button>
+          </div>
+          <input class="opt" type="hidden">
+        </div>`;
       const urlInput = li.querySelector(".u");
-      const preview = li.querySelector(".preview");
+      urlInput.value = url || "";
+      li.querySelector(".opt").value = opt || "";
 
-      function refreshPreview(){
-        const u = urlInput.value.trim();
-        if (/\.gif(\?.*)?$/i.test(u)){
-          preview.src = u;
-          preview.style.display = "block";
-        } else {
-          preview.removeAttribute('src');
-          preview.style.display = "none";
-        }
-      }
-      refreshPreview();
-
-      li.querySelector(".rm").addEventListener("click", ()=>{
-        const wasSelected = (selectedLi === li);
-        li.remove();
-        if (wasSelected) clearInspector();
-        if (editMode && wasSelected) maybePreviewSelected();
+      // Only the handle starts a drag, so text in the inputs can still be selected.
+      li.querySelector(".grab").addEventListener("mousedown", ()=>{ li.draggable = true; });
+      li.addEventListener("dragstart", e=>{
+        if (e.target !== li || !li.draggable) return;
+        li.classList.add("dragging");
+        e.dataTransfer.effectAllowed = "move";
+        try { e.dataTransfer.setData("text/x-kraken-row", ""); } catch {}
       });
-
-      li.querySelector(".edit").addEventListener("click", ()=> selectLi(li));
-
-      li.addEventListener("dragstart", e=>{ li.classList.add("dragging"); e.dataTransfer.effectAllowed="move"; });
-      li.addEventListener("dragend",   ()=> li.classList.remove("dragging"));
+      li.addEventListener("dragend", ()=>{
+        li.classList.remove("dragging");
+        li.draggable = false;
+        afterStructureChange();
+      });
       li.addEventListener("dragover", e=>{
+        const dragging = listEl.querySelector(".item.dragging");
+        if (!dragging) return;
         e.preventDefault();
-        const dragging = listEl.querySelector(".dragging");
-        if(!dragging || dragging === li) return;
+        if (dragging === li) return;
         const rect = li.getBoundingClientRect();
         const before = e.clientY < rect.top + rect.height/2;
         listEl.insertBefore(dragging, before ? li : li.nextSibling);
       });
+      li.addEventListener("drop", e=>{ if (listEl.querySelector(".item.dragging")) e.preventDefault(); });
+
+      li.querySelector(".up").addEventListener("click", ()=> moveRow(li, -1));
+      li.querySelector(".down").addEventListener("click", ()=> moveRow(li, 1));
+      li.querySelector(".rm").addEventListener("click", ()=> removeRow(li));
 
       li.addEventListener("click", (e)=>{
-        if (e.target.tagName === "INPUT" || e.target.tagName === "BUTTON") return;
-        selectLi(li);
+        if (e.target.closest("input,button,textarea,select,label,summary,.inspector")) return;
+        if (selectedLi === li) clearInspector(); else selectLi(li);
+      });
+      li.addEventListener("keydown", (e)=>{
+        if (e.target !== li) return;
+        if (e.key === "Enter" || e.key === " "){ e.preventDefault(); if (selectedLi === li) clearInspector(); else selectLi(li); }
+        else if (e.altKey && e.key === "ArrowUp"){ e.preventDefault(); moveRow(li, -1); }
+        else if (e.altKey && e.key === "ArrowDown"){ e.preventDefault(); moveRow(li, 1); }
+        else if (e.key === "ArrowUp"){ e.preventDefault(); prevRow(li)?.focus(); }
+        else if (e.key === "ArrowDown"){ e.preventDefault(); nextRow(li)?.focus(); }
+        else if (e.key === "Delete"){ e.preventDefault(); removeRow(li); }
       });
 
-
-      urlInput.addEventListener("input", refreshPreview);
+      urlInput.addEventListener("input", ()=>{
+        refreshRow(li, true);
+        clearTimeout(li._thumbTimer);
+        li._thumbTimer = setTimeout(()=> refreshThumb(li, rowUrl(li)), 500);
+        if (li === selectedLi) loadInspectorFromLi(li);
+      });
       urlInput.addEventListener("change", ()=>{
-        refreshPreview();
-        if (li === selectedLi){ loadInspectorFromLi(li); if(editMode) maybePreviewSelected(); }
-      });
-      li.querySelector(".opt").addEventListener("change", ()=>{
-        if (li === selectedLi){ loadInspectorFromLi(li); if(editMode) maybePreviewSelected(); }
+        refreshRow(li);
+        if (li === selectedLi){ loadInspectorFromLi(li); if (editMode) maybePreviewSelected(); }
+        renderGlobalPreview();
       });
 
+      refreshRow(li);
       return li;
+    }
+
+    function moveRow(li, dir){
+      const other = dir < 0 ? prevRow(li) : nextRow(li);
+      if (!other) return;
+      const focused = document.activeElement;
+      if (dir < 0) listEl.insertBefore(li, other); else listEl.insertBefore(other, li);
+      (li.contains(focused) ? focused : li).focus();
+      li.scrollIntoView({ block:"nearest" });
+      afterStructureChange();
+    }
+    function removeRow(li){
+      const next = nextRow(li), prev = prevRow(li);
+      if (selectedLi === li) clearInspector();
+      const label = li.querySelector(".rowName").textContent;
+      li.remove();
+      afterStructureChange();
+      (next || prev || $("add")).focus();
+      toast(`Removed \u201C${label}\u201D`, { action:"Undo", onAction:()=>{
+        if (next && next.isConnected) listEl.insertBefore(li, next);
+        else if (prev && prev.isConnected) prev.after(li);
+        else listEl.appendChild(li);
+        afterStructureChange();
+        li.focus();
+      }});
+    }
+    function duplicateRow(li){
+      const copy = createItem(rowUrl(li), rowOpt(li));
+      li.after(copy);
+      afterStructureChange();
+      selectLi(copy);
+      toast("Duplicated. The copy is selected.");
     }
 
     function toModel(){
       const items = [];
-      for (const li of listEl.querySelectorAll(".item")){
-        const url = li.querySelector(".u").value.trim();
+      for (const li of rows()){
+        const url = rowUrl(li);
         if (!url) continue;
-        const it = parseItem(url, li.querySelector(".opt").value.trim());
-        items.push(it);
+        items.push(parseItem(url, rowOpt(li)));
       }
       return items;
     }
     function fromModel(items){
+      clearInspector();
       listEl.innerHTML = "";
       (items||[]).forEach(it=>{
-        listEl.appendChild(createItem(it.src, itemToOptString(it)));
+        if (it && it.src) listEl.appendChild(createItem(it.src, itemToOptString(it)));
       });
+      afterStructureChange();
+    }
+    function updateListMeta(){
+      const all = rows();
+      const scheduled = all.filter(li => { const it = rowItem(li); return it.at && it.only; }).length;
+      $("listCount").textContent = all.length
+        ? "\u00B7 " + plural(all.length, "item") + (scheduled ? `, ${scheduled} scheduled-only` : "")
+        : "";
+      $("emptyState").hidden = all.length > 0;
+      all.forEach((li, i)=>{
+        li.querySelector(".up").disabled = i === 0;
+        li.querySelector(".down").disabled = i === all.length - 1;
+      });
+    }
+    function afterStructureChange(){
+      updateListMeta();
+      renderGlobalPreview();
+      checkDirty();
     }
 
     /* ---- Import / Export ---- */
-    function importText(text){
-      const lines=(text||"").split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
-      const items=[];
-      for(const line of lines){
+    function parseImport(text){
+      const items = [], problems = [];
+      (text || "").split(/\r?\n/).forEach((raw, i)=>{
+        const line = raw.trim();
+        if (!line || line.startsWith("#")) return;
         const m = line.match(/^(\S+)(?:\s+(\{.*\}))?$/);
-        if(!m) continue;
-        items.push(parseItem(m[1], m[2]||""));
-      }
-      fromModel(items);
-      if (editMode && selectedLi) maybePreviewSelected();
+        if (!m){ problems.push(`line ${i+1} skipped (expected URL or URL {json})`); return; }
+        let opt = m[2] || "";
+        if (opt && !tryParseOpts(opt).ok){ problems.push(`line ${i+1}: options aren't valid JSON, imported the URL only`); opt = ""; }
+        items.push(parseItem(m[1], opt));
+      });
+      return { items, problems };
     }
     function exportText(){
       return toModel().map(it=>{
@@ -595,33 +961,38 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
 
     /* ---- Globals form ---- */
     const els = {
-      interval: document.getElementById("interval"),
-      videoMax: document.getElementById("videoMax"),
-      fit:      document.getElementById("fit"),
-      bg:       document.getElementById("bg"),
-      shuffleGifs: document.getElementById("shuffleGifs"),
-      nightEnabled: document.getElementById("nightEnabled"),
-      nightStart: document.getElementById("nightStart"),
-      nightEnd: document.getElementById("nightEnd"),
-      nightAction: document.getElementById("nightAction"),
-      nightDim: document.getElementById("nightDim"),
-      nightDimNum: document.getElementById("nightDimNum"),
-      nightDimVal: document.getElementById("nightDimVal"),
-      nightStatus: document.getElementById("nightStatus"),
-      scale:    document.getElementById("scale"),
-      scaleVal: document.getElementById("scaleVal"),
-      rot:      document.getElementById("rot"),
-      rotVal:   document.getElementById("rotVal"),
-      tx:       document.getElementById("tx"),
-      txVal:    document.getElementById("txVal"),
-      ty:       document.getElementById("ty"),
-      tyVal:    document.getElementById("tyVal"),
+      interval: $("interval"),
+      videoMax: $("videoMax"),
+      fit:      $("fit"),
+      bg:       $("bg"),
+      bgPicker: $("bgPicker"),
+      shuffleGifs: $("shuffleGifs"),
+      nightEnabled: $("nightEnabled"),
+      nightStart: $("nightStart"),
+      nightEnd: $("nightEnd"),
+      nightAction: $("nightAction"),
+      nightDim: $("nightDim"),
+      nightDimNum: $("nightDimNum"),
+      nightDimVal: $("nightDimVal"),
+      nightStatus: $("nightStatus"),
+      scale:    $("scale"),
+      scaleVal: $("scaleVal"),
+      rot:      $("rot"),
+      rotVal:   $("rotVal"),
+      tx:       $("tx"),
+      txVal:    $("txVal"),
+      ty:       $("ty"),
+      tyVal:    $("tyVal"),
     };
     function updateNightModeStatus(){
       if (!els.nightStatus) return;
-      const active = isNightModeActiveForOptions(readGlobals());
+      const g = readGlobals();
+      const active = isNightModeActiveForOptions(g);
       els.nightStatus.classList.toggle("active", active);
-      els.nightStatus.textContent = active ? "Night mode active now" : "Night mode inactive";
+      els.nightStatus.textContent = !g.nightEnabled ? "Off" : active ? "Active now" : "Scheduled, not active now";
+      const dimOn = g.nightAction === "dim";
+      els.nightDim.disabled = !dimOn;
+      els.nightDimNum.disabled = !dimOn;
     }
     function syncNightDim(value){
       const v = clamp(parseInt(value,10)||70, 10, 95);
@@ -631,19 +1002,52 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
       updateNightModeStatus();
       if (editMode) maybePreviewSelected();
     }
+    function syncCropLabels(){
+      els.scaleVal.textContent = els.scale.value;
+      els.rotVal.textContent = els.rot.value;
+      els.txVal.textContent = els.tx.value;
+      els.tyVal.textContent = els.ty.value;
+    }
+    function hexForPicker(v){
+      const s = String(v || "").trim();
+      if (/^#[0-9a-f]{6}$/i.test(s)) return s.toLowerCase();
+      if (/^#[0-9a-f]{3}$/i.test(s)) return "#" + s.slice(1).split("").map(c=>c+c).join("").toLowerCase();
+      if (/^black$/i.test(s)) return "#000000";
+      if (/^white$/i.test(s)) return "#ffffff";
+      return null;
+    }
+    function syncBgPicker(){
+      const v = els.bg.value.trim();
+      const hex = hexForPicker(v);
+      if (hex) els.bgPicker.value = hex;
+      const valid = !v || CSS.supports("color", v);
+      els.bg.classList.toggle("invalid", !valid);
+      $("bgHelp").textContent = valid ? "Shows around pictures that don't fill the screen." : "That isn't a colour the screen understands. Try #000000 or black.";
+      $("bgHelp").classList.toggle("err", !valid);
+    }
     ["scale","rot","tx","ty"].forEach(id=>{
-      document.getElementById(id).addEventListener("input", ()=>{
-        if(id==="scale") els.scaleVal.textContent = els.scale.value;
-        if(id==="rot") els.rotVal.textContent = els.rot.value;
-        if(id==="tx") els.txVal.textContent = els.tx.value;
-        if(id==="ty") els.tyVal.textContent = els.ty.value;
+      $(id).addEventListener("input", ()=>{
+        syncCropLabels();
         if (editMode) maybePreviewSelected();
       });
+    });
+    $("cropReset").addEventListener("click", ()=>{
+      els.scale.value = 100; els.rot.value = 0; els.tx.value = 0; els.ty.value = 0;
+      syncCropLabels();
+      onAnyChange();
+      if (editMode) maybePreviewSelected();
+    });
+    els.bg.addEventListener("input", syncBgPicker);
+    els.bgPicker.addEventListener("input", ()=>{
+      els.bg.value = els.bgPicker.value;
+      syncBgPicker();
+      onAnyChange();
+      if (editMode) maybePreviewSelected();
     });
     els.nightDim.addEventListener("input", ()=> syncNightDim(els.nightDim.value));
     els.nightDimNum.addEventListener("input", ()=> syncNightDim(els.nightDimNum.value));
     ["interval","videoMax","fit","bg","shuffleGifs","nightEnabled","nightStart","nightEnd","nightAction"].forEach(id=>{
-      document.getElementById(id).addEventListener("change", ()=>{
+      $(id).addEventListener("change", ()=>{
         updateNightModeStatus();
         if (editMode) maybePreviewSelected();
       });
@@ -652,8 +1056,8 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
 
     function readGlobals(){
       return {
-        interval: Math.max(1, parseInt(els.interval.value||"30",10)),
-        videoMax: Math.max(0, parseInt(els.videoMax.value||"0",10)),
+        interval: Math.max(1, parseInt(els.interval.value||"30",10) || 30),
+        videoMax: Math.max(0, parseInt(els.videoMax.value||"0",10) || 0),
         fit: els.fit.value,
         bg:  els.bg.value || "#000000",
         shuffleGifs: !!els.shuffleGifs.checked,
@@ -671,121 +1075,268 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
     function writeGlobals(o){
       els.interval.value = o.interval ?? 30;
       els.videoMax.value = o.videoMax ?? 0;
-      els.fit.value      = o.fit || "contain";
+      els.fit.value      = o.fit === "cover" ? "cover" : "contain";
       els.bg.value       = o.bg || "#000000";
       els.shuffleGifs.checked = !!o.shuffleGifs;
       els.nightEnabled.checked = !!o.nightEnabled;
-      els.nightStart.value = o.nightStart || "23:00";
-      els.nightEnd.value = o.nightEnd || "07:00";
+      els.nightStart.value = padTime(o.nightStart) || "23:00";
+      els.nightEnd.value = padTime(o.nightEnd) || "07:00";
       els.nightAction.value = o.nightAction === "dim" ? "dim" : "black";
       els.nightDim.value = o.nightDim ?? 70;
       els.nightDimNum.value = els.nightDim.value;
       els.nightDimVal.textContent = els.nightDim.value;
-      els.scale.value    = Math.round((o.scale ?? 1) * 100); els.scaleVal.textContent = els.scale.value;
-      els.rot.value      = o.rotDeg ?? 0; els.rotVal.textContent = els.rot.value;
-      els.tx.value       = o.txPct ?? 0;  els.txVal.textContent = els.tx.value;
-      els.ty.value       = o.tyPct ?? 0;  els.tyVal.textContent = els.ty.value;
+      els.scale.value    = Math.round((o.scale ?? 1) * 100);
+      els.rot.value      = o.rotDeg ?? 0;
+      els.tx.value       = o.txPct ?? 0;
+      els.ty.value       = o.tyPct ?? 0;
+      syncCropLabels();
+      syncBgPicker();
       updateNightModeStatus();
     }
 
+    /* ---- Unsaved-changes tracking ---- */
+    function snapshot(){ return JSON.stringify({ items: toModel(), opts: readGlobals() }); }
+    let dirtyTimer = null;
+    function checkDirty(){
+      clearTimeout(dirtyTimer);
+      dirtyTimer = setTimeout(()=>{
+        const dirty = snapshot() !== savedSnapshot;
+        const pill = $("saveState");
+        pill.classList.toggle("dirty", dirty);
+        pill.textContent = dirty ? "Unsaved changes" : "All changes saved";
+        $("save").classList.toggle("dirty", dirty);
+        $("load").disabled = !dirty;
+        document.title = (dirty ? "\u2022 " : "") + "Kraken Media Slideshow";
+      }, 60);
+    }
+    function onAnyChange(){
+      checkDirty();
+      if (selectedLi) refreshInspectorHints();
+      renderGlobalPreview();
+    }
+    configEl.addEventListener("input", onAnyChange);
+    configEl.addEventListener("change", onAnyChange);
+
     /* ---- Persistence ---- */
+    const DEMO_ITEMS = [
+      { src:"https://www.gstatic.com/webp/gallery/1.webp", type:"image" },
+      { src:"https://media.giphy.com/media/l0HlQ7LRal8X9sWzO/giphy.gif", type:"image", seconds:8 },
+      { src:"https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4", type:"video", loop:false }
+    ];
     function saveToLocal(){
-      localStorage.setItem(K_PLAYLIST, JSON.stringify(toModel()));
-      localStorage.setItem(K_OPTIONS, JSON.stringify(readGlobals()));
+      const items = toModel();
+      const all = rows();
+      const skipped = all.length - items.length;
+      const badJson = all.filter(li => rowUrl(li) && !tryParseOpts(rowOpt(li)).ok).length;
+      if (!items.length && !confirm("The playlist is empty. The Kraken falls back to its demo pictures when there is nothing saved. Save anyway?")) return;
+      try {
+        localStorage.setItem(K_PLAYLIST, JSON.stringify(items));
+        localStorage.setItem(K_OPTIONS, JSON.stringify(readGlobals()));
+      } catch (e) {
+        toast("Couldn't save: " + (e && e.message ? e.message : e), { kind:"error" });
+        return;
+      }
+      savedSnapshot = snapshot();
+      checkDirty();
+      const wasEditing = editMode;
       // Exit edit mode and tell device to resume slideshow
       if (editMode) toggleEditMode(false, true);
-      else alert("Saved to this PC.");
+      let msg = wasEditing ? "Saved. Edit Mode ended and the slideshow resumed." : "Saved. The Kraken now uses this playlist.";
+      if (skipped) msg += ` ${plural(skipped, "empty row")} skipped.`;
+      if (badJson) msg += ` ${plural(badJson, "item")} had invalid options JSON (ignored).`;
+      toast(msg, { kind: (skipped || badJson) ? "" : "ok" });
     }
     function loadFromLocal(){
-      const items = JSON.parse(localStorage.getItem(K_PLAYLIST) || "[]");
-      const opts  = JSON.parse(localStorage.getItem(K_OPTIONS)  || "{}");
-      fromModel(items);
-      writeGlobals(opts);
-      if(!items.length){
-        fromModel([
-          { src:"https://www.gstatic.com/webp/gallery/1.webp", type:"image" },
-          { src:"https://media.giphy.com/media/l0HlQ7LRal8X9sWzO/giphy.gif", type:"image", seconds:8 },
-          { src:"https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4", type:"video", loop:false }
-        ]);
-      }
+      let items = [], opts = {};
+      try { items = JSON.parse(localStorage.getItem(K_PLAYLIST) || "[]"); } catch {}
+      try { opts  = JSON.parse(localStorage.getItem(K_OPTIONS)  || "{}"); } catch {}
+      if (!Array.isArray(items)) items = [];
+      writeGlobals(opts && typeof opts === "object" ? opts : {});
+      fromModel(items.length ? items : DEMO_ITEMS);
+      savedSnapshot = snapshot();
+      checkDirty();
+    }
+    function revert(){
+      if (snapshot() !== savedSnapshot && !confirm("Discard your unsaved changes and reload the saved playlist and settings?")) return;
+      loadFromLocal();
+      toast("Reverted to the saved playlist.");
     }
     function clearAll(){
-      localStorage.removeItem(K_PLAYLIST);
-      localStorage.removeItem(K_OPTIONS);
-      fromModel([]); writeGlobals({});
-      loadFromLocal();
+      if (!confirm("Remove every item and reset all settings to their defaults?\n\nNothing changes on the Kraken until you press Save, and Revert brings it all back.")) return;
+      fromModel([]);
+      writeGlobals({});
+      onAnyChange();
+      if (editMode) maybePreviewSelected();
+      toast("Cleared. Press Save to apply, or Revert to undo.");
     }
 
     /* ---- Buttons ---- */
     function addBlankItem(){
       const li = createItem();
       listEl.appendChild(li);
-      // Auto-select the new row
+      afterStructureChange();
       selectLi(li);
-      if (editMode) maybePreviewSelected();
+      li.querySelector(".u").focus();
     }
-    document.getElementById("add").addEventListener("click", addBlankItem);
-    document.getElementById("addBottom").addEventListener("click", addBlankItem);
-    document.getElementById("exportTxt").addEventListener("click", ()=>{
-      const t = exportText();
-      navigator.clipboard.writeText(t).catch(()=>{});
-      alert("Copied playlist text to clipboard.");
-    });
-    document.getElementById("save").addEventListener("click", saveToLocal);
-    document.getElementById("load").addEventListener("click", loadFromLocal);
-    document.getElementById("clear").addEventListener("click", clearAll);
+    ["add","addBottom","emptyAdd"].forEach(id => $(id).addEventListener("click", addBlankItem));
+    $("save").addEventListener("click", saveToLocal);
+    $("load").addEventListener("click", revert);
+    $("clear").addEventListener("click", clearAll);
 
-    /* ---- Import modal wiring ---- */
-    const importBtn = document.getElementById("importTxt");
-    const importOverlay = document.getElementById("importOverlay");
-    const importTextarea = document.getElementById("importTextarea");
-    const importDo = document.getElementById("importDo");
-    const importCancel = document.getElementById("importCancel");
-    function openImport(text=""){ importTextarea.value = text || ""; importOverlay.style.display = "flex"; setTimeout(()=>importTextarea.focus(), 0); }
-    function closeImport(){ importOverlay.style.display = "none"; }
-    function doImport(){ const t = importTextarea.value.trim(); if (!t) { closeImport(); return; } importText(t); closeImport(); }
-    importBtn.addEventListener("click", ()=> openImport());
+    /* ---- Dialogs ---- */
+    let dialogReturnFocus = null;
+    function openDialog(overlay, focusEl){
+      dialogReturnFocus = document.activeElement;
+      overlay.style.display = "flex";
+      setTimeout(()=> focusEl && focusEl.focus(), 0);
+    }
+    function closeDialog(overlay){
+      overlay.style.display = "none";
+      if (dialogReturnFocus && dialogReturnFocus.isConnected) dialogReturnFocus.focus();
+    }
+    function openOverlay(){ return [...document.querySelectorAll(".modalOverlay")].find(o => o.style.display === "flex"); }
+    document.querySelectorAll(".modalOverlay").forEach(o=>{
+      o.addEventListener("click", (e)=>{ if (e.target === o) closeDialog(o); });
+    });
+
+    // Import
+    const importOverlay = $("importOverlay");
+    const importTextarea = $("importTextarea");
+    const importDo = $("importDo");
+    function importMode(){ return document.querySelector('input[name="importMode"]:checked').value; }
+    function updateImportSummary(){
+      const { items, problems } = parseImport(importTextarea.value);
+      const sumEl = $("importSummary");
+      if (!importTextarea.value.trim()){ sumEl.textContent = ""; sumEl.className = "help"; }
+      else {
+        sumEl.textContent = (items.length ? plural(items.length, "item") + " ready." : "No items found.") +
+          (problems.length ? " " + problems.slice(0,3).join("; ") + (problems.length > 3 ? ` (+${problems.length-3} more)` : "") + "." : "");
+        sumEl.className = "help " + (problems.length || !items.length ? "err" : "ok");
+      }
+      importDo.disabled = !items.length;
+      importDo.textContent = items.length ? (importMode() === "replace" ? `Replace with ${plural(items.length, "item")}` : `Add ${plural(items.length, "item")}`) : "Import";
+    }
+    function openImport(){
+      importTextarea.value = "";
+      updateImportSummary();
+      openDialog(importOverlay, importTextarea);
+    }
+    function doImport(){
+      const { items, problems } = parseImport(importTextarea.value);
+      if (!items.length) return;
+      const mode = importMode();
+      if (mode === "replace") fromModel(items);
+      else {
+        items.forEach(it => listEl.appendChild(createItem(it.src, itemToOptString(it))));
+        afterStructureChange();
+      }
+      closeDialog(importOverlay);
+      toast(`${mode === "replace" ? "Replaced the playlist with" : "Added"} ${plural(items.length, "item")}` +
+        (problems.length ? ` (${plural(problems.length, "line")} had problems)` : "") + ". Press Save to apply.");
+      if (editMode && selectedLi) maybePreviewSelected();
+    }
+    $("importTxt").addEventListener("click", openImport);
+    $("emptyImport").addEventListener("click", openImport);
     importDo.addEventListener("click", doImport);
-    importCancel.addEventListener("click", closeImport);
-    importOverlay.addEventListener("click", (e)=>{ if (e.target === importOverlay) closeImport(); });
+    $("importCancel").addEventListener("click", ()=> closeDialog(importOverlay));
+    importTextarea.addEventListener("input", updateImportSummary);
+    document.querySelectorAll('input[name="importMode"]').forEach(r => r.addEventListener("change", updateImportSummary));
     importTextarea.addEventListener("keydown", (e)=>{
-      if (e.key === "Escape") { e.preventDefault(); closeImport(); }
       if ((e.ctrlKey || e.metaKey) && e.key === "Enter") { e.preventDefault(); doImport(); }
+    });
+
+    // Export
+    const exportOverlay = $("exportOverlay");
+    const exportTextarea = $("exportTextarea");
+    async function copyText(text, ta){
+      try { await navigator.clipboard.writeText(text); return true; } catch {}
+      try { ta.focus(); ta.select(); return document.execCommand("copy"); } catch { return false; }
+    }
+    $("exportTxt").addEventListener("click", ()=>{
+      const t = exportText();
+      const n = toModel().length;
+      exportTextarea.value = t;
+      $("exportInfo").textContent = `${plural(n, "item")}, one per line. This is what's in the editor now` +
+        (snapshot() !== savedSnapshot ? ", including unsaved changes." : ".") + " Paste it into Import to restore it.";
+      openDialog(exportOverlay, $("exportCopy"));
+      setTimeout(()=> exportTextarea.select(), 0);
+    });
+    $("exportCopy").addEventListener("click", async ()=>{
+      const ok = await copyText(exportTextarea.value, exportTextarea);
+      if (ok){ closeDialog(exportOverlay); toast("Playlist copied to the clipboard.", { kind:"ok" }); }
+      else toast("Couldn't reach the clipboard. The text is selected: press Ctrl+C.", { kind:"error" });
+    });
+    $("exportClose").addEventListener("click", ()=> closeDialog(exportOverlay));
+
+    // Drop links from a browser onto the playlist
+    const playlistCard = $("playlistCard");
+    function externalDrag(e){
+      if (listEl.querySelector(".item.dragging")) return false;
+      const types = [...(e.dataTransfer?.types || [])];
+      return types.includes("text/uri-list") || types.includes("text/plain");
+    }
+    playlistCard.addEventListener("dragover", (e)=>{
+      if (!externalDrag(e) || e.target.closest("input,textarea")) return;
+      e.preventDefault();
+      playlistCard.classList.add("dropTarget");
+    });
+    playlistCard.addEventListener("dragleave", (e)=>{ if (!playlistCard.contains(e.relatedTarget)) playlistCard.classList.remove("dropTarget"); });
+    playlistCard.addEventListener("drop", (e)=>{
+      playlistCard.classList.remove("dropTarget");
+      if (!externalDrag(e) || e.target.closest("input,textarea")) return;
+      e.preventDefault();
+      const text = e.dataTransfer.getData("text/uri-list") || e.dataTransfer.getData("text/plain") || "";
+      const urls = text.split(/\r?\n/).map(s=>s.trim()).filter(s => s && !s.startsWith("#") && /^(https?:|data:)/i.test(s));
+      if (!urls.length){ toast("That didn't look like an image or video link.", { kind:"error" }); return; }
+      urls.forEach(u => listEl.appendChild(createItem(u, "")));
+      afterStructureChange();
+      toast(`Added ${plural(urls.length, "item")}. Press Save to apply.`);
     });
 
     /* --------- Per-item Inspector --------- */
     const ins = {
-      root: document.getElementById("inspector"),
-      type: document.getElementById("insType"),
-      url:  document.getElementById("insUrl"),
-      apply: document.getElementById("applyItem"),
-      clear: document.getElementById("clearItem"),
-      seconds: document.getElementById("i_seconds"),
-      loop:    document.getElementById("i_loop"),
-      maxSeconds: document.getElementById("i_maxSeconds"),
-      fit:     document.getElementById("i_fit"),
-      at:      document.getElementById("i_at"),
-      atOnly:  document.getElementById("i_atOnly"),
-      scale:   document.getElementById("i_scale"),
-      scaleEnabled: document.getElementById("i_scale_enabled"),
-      scaleNum: document.getElementById("i_scale_num"),
-      rotDeg:  document.getElementById("i_rotDeg"),
-      rotDegEnabled: document.getElementById("i_rotDeg_enabled"),
-      rotDegNum: document.getElementById("i_rotDeg_num"),
-      txPct:   document.getElementById("i_txPct"),
-      txPctEnabled: document.getElementById("i_txPct_enabled"),
-      txPctNum: document.getElementById("i_txPct_num"),
-      tyPct:   document.getElementById("i_tyPct"),
-      tyPctEnabled: document.getElementById("i_tyPct_enabled"),
-      tyPctNum: document.getElementById("i_tyPct_num"),
+      root: $("inspector"),
+      home: $("inspectorHome"),
+      preview: $("i_preview"),
+      name: $("i_name"),
+      seconds: $("i_seconds"),
+      secondsHelp: $("i_seconds_help"),
+      loop:    $("i_loop"),
+      videoHelp: $("i_video_help"),
+      maxSeconds: $("i_maxSeconds"),
+      fit:     $("i_fit"),
+      fitHelp: $("i_fit_help"),
+      at:      $("i_at"),
+      atOnly:  $("i_atOnly"),
+      json:    $("i_json"),
+      jsonMsg: $("i_json_msg"),
+      jsonBox: $("i_jsonBox"),
+      scale:   $("i_scale"),
+      scaleEnabled: $("i_scale_enabled"),
+      scaleNum: $("i_scale_num"),
+      scaleG:  $("i_scale_g"),
+      rotDeg:  $("i_rotDeg"),
+      rotDegEnabled: $("i_rotDeg_enabled"),
+      rotDegNum: $("i_rotDeg_num"),
+      rotDegG: $("i_rotDeg_g"),
+      txPct:   $("i_txPct"),
+      txPctEnabled: $("i_txPct_enabled"),
+      txPctNum: $("i_txPct_num"),
+      txPctG:  $("i_txPct_g"),
+      tyPct:   $("i_tyPct"),
+      tyPctEnabled: $("i_tyPct_enabled"),
+      tyPctNum: $("i_tyPct_num"),
+      tyPctG:  $("i_tyPct_g"),
     };
 
     function setSegmentedValue(id, value){
-      const input = document.getElementById(id);
+      const input = $(id);
       if (!input) return;
       input.value = value;
       document.querySelectorAll(`.segmented[data-bound="${id}"] .segBtn`).forEach(btn=>{
-        btn.classList.toggle("active", btn.dataset.value === value);
+        const on = btn.dataset.value === value;
+        btn.classList.toggle("active", on);
+        btn.setAttribute("aria-pressed", on ? "true" : "false");
       });
     }
 
@@ -826,38 +1377,86 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
       if (source === "number") input.value = clampControlValue(input, number.value);
       else number.value = input.value;
     }
+    function globalSliderValue(name, g){ return name === "scale" ? Math.round(g.scale * 100) : g[name]; }
 
     function clearInspector(){
-      if (selectedLi) selectedLi.classList.remove("selected");
+      if (selectedLi){
+        selectedLi.classList.remove("selected");
+        selectedLi.setAttribute("aria-expanded", "false");
+      }
       selectedLi = null;
-      ins.root.style.display = "none";
+      ins.home.appendChild(ins.root);
+      updateEditBanner();
+      renderGlobalPreview();
       if (editMode) maybePreviewSelected(); // clears preview
     }
+    function setJsonStatus(p, typing=false){
+      ins.json.classList.toggle("invalid", !p.ok);
+      ins.jsonMsg.className = "help" + (p.ok ? "" : " err");
+      ins.jsonMsg.textContent = p.ok
+        ? "Edit by hand if you prefer. Applied when you leave the box (or Ctrl+Enter)."
+        : "Invalid JSON: " + p.error + (typing ? "" : " The item uses no options until this is fixed; changing a setting above replaces this text.");
+    }
+    function refreshInspectorHints(){
+      if (!selectedLi) return;
+      const it = rowItem(selectedLi);
+      const g = readGlobals();
+      ins.seconds.placeholder = `${g.interval} (global)`;
+      ins.secondsHelp.textContent = `Leave empty to use the global ${g.interval} s.`;
+      const cap = g.videoMax || it.maxSeconds || 0;
+      ins.videoHelp.textContent = cap
+        ? `Moves on after ${cap} s, holding the last frame if the video is shorter.` +
+          (g.videoMax ? ` The global max video length (${g.videoMax} s) wins over this item's own setting.` : "") +
+          (it.loop === true ? " Loop has no effect while a stop time is set." : "")
+        : it.loop === true ? `Loops for ${g.interval} s (the global image time), then moves on.`
+        : "Plays to the end, then moves on.";
+      ins.fitHelp.textContent = (ins.fit.value === "inherit" ? `Using the global fit (${g.fit}). ` : "") +
+        "Contain shows the whole picture; Cover fills the circle and crops the edges.";
+      sliderControls.forEach(name=>{
+        const gv = globalSliderValue(name, g);
+        const unit = name === "rotDeg" ? "\u00B0" : "%";
+        ins[name + "G"].textContent = ins[name + "Enabled"].checked ? "" : `(global ${gv}${unit})`;
+      });
+      ins.atOnly.disabled = !ins.at.value;
+      renderPreview(ins.preview, it, mergeOpts(g, it));
+    }
     function loadInspectorFromLi(li){
-      const url = li.querySelector(".u").value.trim();
-      const raw = li.querySelector(".opt").value.trim();
-      const it  = parseItem(url, raw);
-      ins.type.textContent = (it.type || inferType(url)).toUpperCase();
-      ins.url.textContent = url || "(no url)";
-      ins.seconds.value   = it.type==="image" ? (it.seconds||0) : 0;
+      const url = rowUrl(li);
+      const raw = rowOpt(li);
+      const parsed = tryParseOpts(raw);
+      const it  = parseItem(url, parsed.ok ? raw : "");
+      const type = inferType(url);
+      ins.root.querySelectorAll(".forImage").forEach(el => el.hidden = type !== "image");
+      ins.root.querySelectorAll(".forVideo").forEach(el => el.hidden = type !== "video");
+      ins.name.value = it.name != null ? String(it.name) : "";
+      ins.seconds.value = type === "image" && it.seconds ? it.seconds : "";
       setSegmentedValue("i_loop", (typeof it.loop === "boolean") ? String(it.loop) : "inherit");
-      ins.maxSeconds.value= it.maxSeconds || 0;
-      setSegmentedValue("i_fit", it.fit ? it.fit : "inherit");
-      ins.at.value        = it.at || "";
+      ins.maxSeconds.value = it.maxSeconds || "";
+      setSegmentedValue("i_fit", (it.fit === "contain" || it.fit === "cover") ? it.fit : "inherit");
+      ins.at.value        = padTime(it.at);
       ins.atOnly.checked  = !!it.only;
-      setOverrideSlider("scale", it.scale!=null, it.scale!=null ? Math.round(it.scale*100) : 100);
-      setOverrideSlider("rotDeg", it.rotDeg!=null, it.rotDeg!=null ? it.rotDeg : 0);
-      setOverrideSlider("txPct", it.txPct!=null, it.txPct!=null ? it.txPct : 0);
-      setOverrideSlider("tyPct", it.tyPct!=null, it.tyPct!=null ? it.tyPct : 0);
+      const g = readGlobals();
+      setOverrideSlider("scale", it.scale!=null, it.scale!=null ? Math.round(it.scale*100) : globalSliderValue("scale", g));
+      setOverrideSlider("rotDeg", it.rotDeg!=null, it.rotDeg!=null ? it.rotDeg : g.rotDeg);
+      setOverrideSlider("txPct", it.txPct!=null, it.txPct!=null ? it.txPct : g.txPct);
+      setOverrideSlider("tyPct", it.tyPct!=null, it.tyPct!=null ? it.tyPct : g.tyPct);
+      if (document.activeElement !== ins.json){
+        ins.json.value = raw;
+        setJsonStatus(parsed);
+        if (!parsed.ok) ins.jsonBox.open = true;
+      }
+      refreshInspectorHints();
     }
     function writeLiFromInspector(li){
-      const url = li.querySelector(".u").value.trim();
-      if (!url) return alert("URL is required for this item.");
+      const url = rowUrl(li);
       const type = inferType(url);
-      const it = parseItem(url, li.querySelector(".opt").value.trim());
+      const it = parseItem(url, rowOpt(li));
       it.type = type;
 
       delete it.playOnce;
+
+      const name = ins.name.value.trim();
+      if (name) it.name = name; else delete it.name;
 
       const seconds = parseInt(ins.seconds.value||"0",10);
       if (type==="image"){
@@ -877,7 +1476,7 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
 
       const at = ins.at.value.trim();
       if (at) it.at = at; else delete it.at;
-      if (ins.atOnly.checked) it.only = true; else delete it.only;
+      if (at && ins.atOnly.checked) it.only = true; else delete it.only;
 
       if (ins.scaleEnabled.checked){
         it.scale = clamp(parseInt(ins.scale.value,10)/100, 0.01, 5);
@@ -890,19 +1489,30 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
       li.querySelector(".opt").value = itemToOptString(it);
     }
     function selectLi(li){
-      if (selectedLi) selectedLi.classList.remove("selected");
+      if (selectedLi && selectedLi !== li){
+        selectedLi.classList.remove("selected");
+        selectedLi.setAttribute("aria-expanded", "false");
+      }
       selectedLi = li;
       li.classList.add("selected");
-      ins.root.style.display = "block";
+      li.setAttribute("aria-expanded", "true");
+      ins.jsonBox.open = false;
+      li.appendChild(ins.root);
       loadInspectorFromLi(li);
+      updateEditBanner();
+      renderGlobalPreview();
       if (editMode) maybePreviewSelected();
+      // Keep the row's header in view (below the sticky toolbar) as the inspector opens.
+      const top = li.getBoundingClientRect().top;
+      const barBottom = document.querySelector(".topBar").getBoundingClientRect().bottom;
+      if (top < barBottom + 4 || top > window.innerHeight * 0.6) window.scrollBy({ top: top - barBottom - 8 });
     }
 
     function getSelectedItemAndOptions(){
       if (!selectedLi) return null;
-      const url = selectedLi.querySelector(".u").value.trim();
+      const url = rowUrl(selectedLi);
       if (!url) return null;
-      const it = parseItem(url, selectedLi.querySelector(".opt").value.trim());
+      const it = parseItem(url, rowOpt(selectedLi));
       const opts = readGlobals();
       return { it, opts: mergeOpts(opts, it) };
     }
@@ -917,16 +1527,22 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
       if (!selectedLi) return;
       sliderControls.forEach(syncOverrideSlider);
       writeLiFromInspector(selectedLi);
+      refreshRow(selectedLi, true);
+      if (document.activeElement !== ins.json){ ins.json.value = rowOpt(selectedLi); setJsonStatus({ ok:true }); }
+      refreshInspectorHints();
+      updateListMeta();
+      checkDirty();
       if (editMode) maybePreviewSelected();
     }
 
-    [ins.seconds, ins.maxSeconds, ins.at].forEach(el=>{
+    [ins.name, ins.seconds, ins.maxSeconds, ins.at].forEach(el=>{
       el.addEventListener("input", commitInspectorLive);
       el.addEventListener("change", commitInspectorLive);
     });
     [ins.loop, ins.fit, ins.atOnly].forEach(el=>{
       el.addEventListener("change", commitInspectorLive);
     });
+    $("i_atClear").addEventListener("click", ()=>{ ins.at.value = ""; ins.atOnly.checked = false; commitInspectorLive(); });
     sliderControls.forEach(name=>{
       ins[name].addEventListener("input", ()=>{
         syncOverrideSlider(name, "range");
@@ -940,41 +1556,130 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
         syncOverrideSlider(name, "number");
         commitInspectorLive();
       });
-      ins[name + "Enabled"].addEventListener("change", commitInspectorLive);
+      ins[name + "Enabled"].addEventListener("change", ()=>{
+        // Start a new override from the global value, so ticking it changes nothing yet.
+        if (ins[name + "Enabled"].checked){
+          ins[name].value = clampControlValue(ins[name], globalSliderValue(name, readGlobals()));
+          ins[name + "Num"].value = ins[name].value;
+        }
+        commitInspectorLive();
+      });
     });
 
-    // apply/clear buttons
-    ins.apply.addEventListener("click", ()=>{
+    function applyJson(){
       if (!selectedLi) return;
-      writeLiFromInspector(selectedLi);
+      const p = tryParseOpts(ins.json.value);
+      if (!p.ok){ setJsonStatus(p); return; }
+      const it = parseItem(rowUrl(selectedLi), "");
+      const extra = Object.assign({}, p.value);
+      delete extra.src; delete extra.type;
+      Object.assign(it, extra);
+      const s = itemToOptString(it);
+      selectedLi.querySelector(".opt").value = s;
+      ins.json.value = s;
+      setJsonStatus({ ok:true });
       loadInspectorFromLi(selectedLi);
+      refreshRow(selectedLi, true);
+      updateListMeta();
+      checkDirty();
       if (editMode) maybePreviewSelected();
+    }
+    ins.json.addEventListener("input", ()=> setJsonStatus(tryParseOpts(ins.json.value), true));
+    ins.json.addEventListener("change", applyJson);
+    ins.json.addEventListener("keydown", (e)=>{
+      if ((e.ctrlKey || e.metaKey) && e.key === "Enter"){ e.preventDefault(); applyJson(); }
     });
-    ins.clear.addEventListener("click", ()=>{
+
+    // inspector buttons
+    $("insDone").addEventListener("click", ()=>{ const li = selectedLi; clearInspector(); li && li.focus(); });
+    $("insDup").addEventListener("click", ()=>{ if (selectedLi) duplicateRow(selectedLi); });
+    $("insRemove").addEventListener("click", ()=>{ if (selectedLi) removeRow(selectedLi); });
+    $("clearItem").addEventListener("click", ()=>{
       if (!selectedLi) return;
-      selectedLi.querySelector(".opt").value = "";
-      loadInspectorFromLi(selectedLi);
+      const before = rowOpt(selectedLi);
+      const it = rowItem(selectedLi);
+      selectedLi.querySelector(".opt").value = it.name ? JSON.stringify({ name: it.name }) : "";
+      const li = selectedLi;
+      loadInspectorFromLi(li);
+      refreshRow(li, true);
+      updateListMeta();
+      checkDirty();
       if (editMode) maybePreviewSelected();
+      if (before) toast("Options reset for this item.", { action:"Undo", onAction:()=>{
+        li.querySelector(".opt").value = before;
+        refreshRow(li, true);
+        if (li === selectedLi) loadInspectorFromLi(li);
+        updateListMeta();
+        checkDirty();
+        if (editMode) maybePreviewSelected();
+      }});
     });
+
+    /* ---- Global crop preview ---- */
+    function renderGlobalPreview(){
+      const box = $("g_preview");
+      const label = $("g_previewLabel");
+      const li = (selectedLi && rowUrl(selectedLi)) ? selectedLi : rows().find(r => rowUrl(r));
+      const g = readGlobals();
+      if (!li){ renderPreview(box, null, g); label.textContent = "Add an item to preview"; return; }
+      const it = rowItem(li);
+      renderPreview(box, it, g);
+      label.textContent = "Global settings on: " + li.querySelector(".rowName").textContent;
+    }
 
     /* ---- Edit mode toggle ---- */
-    const editBtn = document.getElementById("editModeBtn");
+    const editBtn = $("editModeBtn");
+    function updateEditBanner(){
+      const b = $("editBanner");
+      b.hidden = !editMode;
+      if (!editMode) return;
+      b.textContent = (selectedLi && rowUrl(selectedLi))
+        ? "Edit Mode: the Kraken shows the selected item and follows your changes. Save to apply them and resume the slideshow, or Exit Edit Mode to resume without saving."
+        : "Edit Mode: select an item to show it on the Kraken. Save applies your changes and resumes the slideshow.";
+    }
     function toggleEditMode(on, fromSave=false){
+      if (on && !selectedLi){
+        const first = rows().find(r => rowUrl(r));
+        if (first) selectLi(first);
+      }
       editMode = on;
-      editBtn.textContent = on ? "Exit Edit Mode" : "Enter Edit Mode";
+      editBtn.textContent = on ? "Exit Edit Mode" : "Edit Mode";
+      editBtn.classList.toggle("live", on);
+      editBtn.setAttribute("aria-pressed", on ? "true" : "false");
+      updateEditBanner();
       if (on){
         const data = getSelectedItemAndOptions();
         postEditMessage({ action:"start", item: data?.it || null, options: data?.opts || readGlobals() });
         if (data) postEditMessage({ action:"update", item:data.it, options:data.opts });
       } else {
         postEditMessage({ action:"end" });
-        if (fromSave) alert("Saved and exited Edit Mode.");
+        if (!fromSave) toast("Edit Mode ended. The Kraken resumed the saved slideshow.");
       }
     }
     editBtn.addEventListener("click", ()=> toggleEditMode(!editMode));
 
+    /* ---- Keyboard shortcuts ---- */
+    document.addEventListener("keydown", (e)=>{
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === "s"){
+        e.preventDefault();
+        if (!openOverlay()) saveToLocal();
+        return;
+      }
+      if (e.key === "Escape"){
+        const o = openOverlay();
+        if (o){ e.preventDefault(); closeDialog(o); return; }
+        if (selectedLi && selectedLi.contains(document.activeElement)){
+          const li = selectedLi; clearInspector(); li.focus();
+        }
+      }
+    });
+    document.addEventListener("mouseup", ()=>{
+      // A press on the drag handle that didn't turn into a drag
+      rows().forEach(li => { if (!li.classList.contains("dragging")) li.draggable = false; });
+    });
+
     /* Init Configure mode */
-    document.getElementById("config").style.display = "block";
+    configEl.style.display = "block";
     loadFromLocal();
     updateNightModeStatus();
   }
