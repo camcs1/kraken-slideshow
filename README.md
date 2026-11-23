@@ -1,88 +1,171 @@
-# Kraken Media Slideshow (with Configure UI, Drag-Drop, and Preview)
+# Kraken Media Slideshow
 
-This project lets you run a fully custom media slideshow on an **NZXT Kraken LCD** using the CAM **Web Integration** feature.  
-It supports images (`png`, `jpg`, `gif`, `webp`) and video (`mp4`, `webm`) with flexible intervals and cropping options designed for the Kraken’s circular screen.
+A custom media slideshow for the **NZXT Kraken LCD**, running through NZXT CAM's
+**Web Integration**. It plays images (`png`, `jpg`, `gif`, `webp`) and video
+(`mp4`, `webm`) with intervals, scheduling, night mode and cropping tuned for the
+Kraken's round screen.
+
+An optional local **bridge** adds remote control (from Home Assistant, HASS.Agent
+or PowerShell) and a **MilkDrop music visualizer** that reacts to whatever the PC
+is playing.
 
 ---
 
 ## Features
-- **Configure button support**: When you click **Configure** in CAM, a configuration UI opens.
-- **Drag-and-drop playlist editor**: Add, remove, and reorder media URLs with simple handles. Add buttons are available at the top and bottom of the list.
-- **Per-item options**: Add JSON options for each item, e.g.
-    - Images/GIFs: `{ "seconds": 45 }` for custom duration
-    - Videos: `{ "loop": true, "maxSeconds": 8 }`
-    - Scheduled: `{ "at": "16:20" }` to show at 4:20 PM daily (add `{ "only": true }` to hide from normal rotation)
-- **Global options**:
-  - Image interval and video max length
-  - Optional GIF order scrambling
-  - Night mode based on the Kraken browser/device local time, with black screen or dim overlay
-  - Object fit: `contain` or `cover`
-  - Background color
-  - Circular mask vs. square
-  - Circle padding (to avoid clipping on the edge)
-  - Optional ring border (width + color)
-  - Zoom, X/Y offset, rotation
-- **Live Preview inside Configure**: Test the slideshow with current unsaved settings before saving.
-- **Device playback**: When opened with `?kraken=1`, the page runs on the Kraken LCD using saved settings.
-- **Remote control (optional)**: Run the small local bridge in [`bridge/`](bridge/README.md) to drive the screen from HASS.Agent / Home Assistant or PowerShell: next/prev, pause, push an image, force night mode.
+
+### Slideshow
+- **Configure UI**: click **Configure** in CAM to open the editor.
+- **Drag-and-drop playlist**: add, remove and reorder media URLs.
+- **Per-item options** (JSON after the URL):
+  - Images/GIFs: `{"seconds": 45}` for a custom duration
+  - Videos: `{"loop": true, "maxSeconds": 8}`
+  - Scheduled: `{"at": "16:20"}` shows it at 4:20 PM daily; add `"only": true` to keep it out of normal rotation
+  - Naming: `{"name": "Front Door"}` gives it a friendly name for remote picking
+- **Global options**: image interval and video max length, GIF order scrambling,
+  night mode (black or dim, by the Kraken browser's local time), `contain`/`cover`,
+  background colour, circular mask, circle padding, ring border, zoom, X/Y offset
+  and rotation.
+- **Live preview** inside Configure, using your unsaved settings.
+
+### Remote control (optional, via the bridge)
+- Next / previous, jump to an item, pause and resume.
+- **Pick** an item by name or number and hold it, or **hold** whatever is on
+  screen now, then return to the **slideshow** where it left off.
+- **Show** any image or video URL, for a set time or until dismissed.
+- Force night mode on/off, or back to its schedule.
+- Status: what's on screen, mode and position.
+
+### MilkDrop visualizer (optional, via the bridge)
+- MilkDrop presets rendered with [Butterchurn](https://github.com/jberg/butterchurn)
+  (100 presets), driven by the PC's system audio.
+- Next / previous / random preset, or start on a preset by name.
+- Adjustable render size and frame cap, because CAM renders WebGL on the CPU.
 
 ---
 
 ## How it works
-- CAM opens **two browser instances** for each integration:
-  - The **Kraken Browser** (with `?kraken=1`) → renders the slideshow on the pump screen.
-  - The **Configuration Browser** (without the query) → shows the editor UI.
-- Both contexts share the same `localStorage`. The config you save in the editor is immediately available to the device renderer.
+
+```
+                         ┌───────────── NZXT CAM ─────────────┐
+                         │  Kraken browser (?kraken=1) ── LCD  │
+GitHub Pages index.html ─┤  Configure browser (editor)         │
+                         └──────────────┬──────────────────────┘
+                                        │ ws://127.0.0.1:27880 (optional)
+Home Assistant ─MQTT─▶ HASS.Agent ─▶ bridge (node) ◀─UDP─ audio helper (python)
+                     PowerShell ──HTTP──┘
+```
+
+- CAM opens **two browser instances** per integration: the **Kraken browser**
+  (with `?kraken=1`) draws on the pump screen, and the **Configuration browser**
+  shows the editor. Both share `localStorage`, so saved settings reach the screen
+  straight away.
+- For remote control, the Kraken page connects out to a small bridge on the same
+  PC. CAM's browser allows an https page to reach `localhost`, so the page can
+  stay on GitHub Pages. The bridge listens on `127.0.0.1` only. Without it the
+  slideshow plays exactly as normal.
 
 ---
 
 ## Installation
-1. Clone or download this repository.
-2. Copy `index.html` and `.nojekyll` to a **public GitHub Pages repo**.  
-   - Example: `https://github.com/YOURUSER/kraken-slideshow`
-3. Enable Pages: **Settings → Pages → Branch → main → /(root)**.
-4. In NZXT CAM → **Lighting → Web Integration**, set the URL to your Pages site root:  
+
+### Slideshow
+1. Fork or copy this repository (`index.html` and `.nojekyll` are all the page needs).
+2. Enable GitHub Pages: **Settings → Pages → Branch → main → / (root)**.
+3. In NZXT CAM → **Lighting → Kraken → LCD Display → Web Integration**, set the URL to:
+   ```
+   https://YOURUSER.github.io/kraken-slideshow/index.html
+   ```
+
+### Bridge (remote control and visualizer)
+Requires **Node.js 18+**. The visualizer also needs **Python 3** with
+`pip install --user soundcard`.
+
+```powershell
+node bridge\kraken-bridge.js
 ```
 
-[https://YOURUSER.github.io/kraken-slideshow/index.html](https://YOURUSER.github.io/kraken-slideshow/index.html)
+To start it hidden at every logon:
 
+```powershell
+powershell -ExecutionPolicy Bypass -File bridge\install-startup.ps1
 ```
+
+Check that the Kraken page has connected (`clients` should be 1):
+
+```powershell
+node bridge\kraken-bridge.js status
+```
+
+Full command reference and setup details: [bridge/README.md](bridge/README.md).
 
 ---
 
 ## Usage
-1. In CAM, click the integration’s **Configure** button.  
-- Add media items by URL.  
-- Optionally supply per-item JSON options.  
-- Drag and drop to reorder.
-2. Adjust global options (intervals, scaling, night mode, offsets, etc.).
-3. Use **Enter Edit Mode** to see a live test of the selected item with current unsaved settings.
-4. Click **Save** to store your configuration in localStorage.
-5. The Kraken Browser (`?kraken=1`) automatically reads those saved settings and plays the slideshow.
+
+### Editing the playlist
+1. In CAM, click the integration's **Configure** button.
+2. Add media URLs, with optional per-item JSON, and drag to reorder.
+3. Adjust global options (intervals, scaling, night mode, offsets…).
+4. **Enter Edit Mode** to test the selected item live with unsaved settings.
+5. **Save**. The Kraken browser picks up the new settings automatically.
+
+### Remote commands
+Any of these works with `node bridge\kraken-bridge.js send …`, as an HTTP call
+to `http://127.0.0.1:27880/…`, or through HASS.Agent:
+
+| Command | Effect |
+|---|---|
+| `next` / `prev` | Step through the playlist |
+| `pick 12` / `pick Front Door` | Hold item 12 (0-based) or the item with that name |
+| `hold` | Hold whatever is on screen now |
+| `slideshow` | Back to rotation, where it was before the pick |
+| `show <url> [seconds]` | Show any image or video |
+| `night on` / `off` / `auto` | Force night mode, or follow the schedule |
+| `visualizer on [preset]` | Start the MilkDrop visualizer |
+| `visualizer next` / `prev` / `random` | Change preset |
+| `visualizer res 256` / `fps 20` | Tune render size / frame cap |
+| `reload` | Reload the Kraken page (picks up a new `index.html`) |
+
+### Home Assistant
+With [HASS.Agent](https://github.com/hass-agent/HASS.Agent) on the PC, one
+**Custom** command pointing at `bridge\kraken.cmd` takes any of the commands
+above as its MQTT action payload. A Home Assistant script that publishes to that
+command's action topic can then back dashboard buttons, automations and a
+pick-by-number text box. PowerShell sensors using `bridge\kraken-sensor.ps1`
+report the mode, position (or visualizer preset and fps) and the URL on screen.
+See [bridge/README.md](bridge/README.md#hassagent-setup) for the exact setup and
+a gotcha with how HASS.Agent quotes commands.
+
+### Visualizer performance
+CAM's browser renders WebGL in software (on the CPU), so the visualizer's cost
+scales with its render size. Measured on one PC: the slideshow alone used about
+0.65 of a CPU core; the visualizer at the default 192 px and 40 fps used about
+1.5–2 cores, and about 4 at 320 px. CAM only produces about 40 frames a second,
+so a frame cap skips whole frames (a cap of 30 gives 20 fps). Night mode set to
+black pauses rendering.
 
 ---
 
-## Example Playlist Entries
+## Example playlist entries
+```
+https://www.gstatic.com/webp/gallery/1.webp
+https://media.giphy.com/media/l0HlQ7LRal8X9sWzO/giphy.gif
+https://example.com/clip.mp4 {"loop":true,"maxSeconds":10}
+https://example.com/image2.jpg {"seconds":60}
+https://example.com/snoop.jpg {"at":"16:20","only":true}
+https://example.com/door.jpg {"name":"Front Door"}
 ```
 
-[https://www.gstatic.com/webp/gallery/1.webp](https://www.gstatic.com/webp/gallery/1.webp)
-[https://media.giphy.com/media/l0HlQ7LRal8X9sWzO/giphy.gif](https://media.giphy.com/media/l0HlQ7LRal8X9sWzO/giphy.gif)
-[https://example.com/clip.mp4](https://example.com/clip.mp4) {"loop"\:true,"maxSeconds":10}
-[https://example.com/image2.jpg](https://example.com/image2.jpg) {"seconds":60}
-  [https://example.com/snoop.jpg](https://example.com/snoop.jpg) {"at":"16:20","only":true}
-
-```
-
 ---
 
-## Notes & Tips
-- **Circle padding** (default 4%) ensures content isn’t clipped on the very edge of the Kraken’s round LCD.
-- **Zoom + offsets** help you center subjects inside the circle.
-- **Night mode** uses the local time of the browser running on the Kraken display. Configure it from its own Night mode panel. The editor shows whether Night mode would be active now, but Edit Mode bypasses the black/dim overlay so item editing remains visible.
-- The **Preview** inside Configure is only for you — the Kraken continues running its own browser instance.
-- All data is stored in your PC’s **localStorage**. Each PC has its own saved config.
-
----
-
-Enjoy your fully custom Kraken slideshow!
-
+## Notes & tips
+- **Circle padding** (default 4%) keeps content off the very edge of the round LCD.
+- **Zoom and offsets** help centre subjects inside the circle.
+- **Night mode** uses the local time of the browser running on the Kraken. The
+  editor shows whether it would be active now; Edit Mode bypasses the overlay so
+  you can still see what you're editing.
+- The **Preview** inside Configure is only for you; the Kraken keeps running its
+  own browser instance.
+- Settings live in **localStorage** on each PC. Moving the page to a different
+  URL starts with an empty playlist (use export/import in Configure).
+- The bridge and visualizer helper only accept connections from the same PC.
