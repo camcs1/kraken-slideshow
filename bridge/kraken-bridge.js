@@ -39,7 +39,7 @@ const PORT = Number(process.env.KRAKEN_BRIDGE_PORT || 27880);
 const AUDIO_PORT = Number(process.env.KRAKEN_AUDIO_PORT || 27881);       // UDP from kraken-audio.py
 const PYTHON = process.env.KRAKEN_PYTHON || "python";
 const ACTIONS = new Set(["next", "prev", "pause", "resume", "slideshow", "pick", "hold", "show", "goto", "night", "reload", "visualizer"]);
-const VIZ_MODES = ["on", "off", "next", "prev", "random", "res"];
+const VIZ_MODES = ["on", "off", "next", "prev", "random", "res", "fps"];
 
 /* ------------------------------------------------------------------ CLI */
 if (["send", "status", "playlist", "presets"].includes(process.argv[2])) {
@@ -64,7 +64,7 @@ function cliArgsToCommand([action, ...rest]) {
     case "visualizer": {
       const mode = (rest[0] || "on").toLowerCase();
       const arg = rest.slice(1).join(" ").trim();
-      if (mode === "res") return { action, mode, value: Number(arg) };
+      if (mode === "res" || mode === "fps") return { action, mode, value: Number(arg) };
       return arg ? { action, mode, preset: arg } : { action, mode };
     }
     default:      return { action };
@@ -205,7 +205,7 @@ function startServer() {
 
       if (cmd.action === "visualizer") {
         if (cmd.mode === "off") stopAudio();
-        else if (cmd.mode !== "res") startAudio();
+        else if (cmd.mode !== "res" && cmd.mode !== "fps") startAudio();
       }
 
       broadcast(clients, cmd);
@@ -287,6 +287,7 @@ function validate(cmd) {
     cmd.mode = cmd.mode || "on";
     if (!VIZ_MODES.includes(cmd.mode)) return `visualizer mode must be one of: ${VIZ_MODES.join(", ")}`;
     if (cmd.mode === "res" && !(cmd.value >= 128 && cmd.value <= 1024)) return "visualizer res needs a size from 128 to 1024";
+    if (cmd.mode === "fps" && !(cmd.value >= 5 && cmd.value <= 60)) return "visualizer fps needs a rate from 5 to 60";
   }
   return null;
 }
