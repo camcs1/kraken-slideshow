@@ -52,19 +52,11 @@
     font-family:"Segoe UI",system-ui,sans-serif; color:#fff; line-height:1.08;
     text-shadow:0 0 2px #000, 0 0 10px rgba(0,0,0,.9), 0 0 28px rgba(120,190,255,.55);
   }
-  .trackTitle .tt-title{font-weight:800; font-size:var(--tt-size,9vmin); letter-spacing:.01em;
-    overflow-wrap:anywhere; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden}
-  .trackTitle .tt-artist{margin-top:1.6vmin; font-weight:500; font-size:5.2vmin; opacity:.85;
-    white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
-  .trackTitle.pop{visibility:visible; animation:ttPop var(--tt-time,5.6s) linear forwards}
-  @keyframes ttPop{
-    0%   {opacity:0; transform:translate(-50%,-50%) scale(.35); filter:blur(4px)}
-    5%   {opacity:1; transform:translate(-50%,-50%) scale(1.14); filter:blur(0)}
-    9%   {transform:translate(-50%,-50%) scale(.97)}
-    12%  {transform:translate(-50%,-50%) scale(1)}
-    68%  {opacity:1; transform:translate(-50%,-50%) scale(1.03); filter:blur(0)}
-    100% {opacity:0; transform:translate(-50%,-50%) scale(1.22); filter:blur(7px); visibility:hidden}
-  }
+  .trackTitle .tt-title{font-weight:800; font-size:var(--tt-size,9vmin); letter-spacing:.01em}
+  .trackTitle .tt-artist{margin-top:1.6vmin; font-weight:500; font-size:5.2vmin; opacity:.85}
+  /* Words never break inside; letters are inline-blocks so each can wobble. */
+  .trackTitle .w{white-space:nowrap}
+  .trackTitle .c{display:inline-block; will-change:transform}
   .contain{object-fit:contain}
   .cover{object-fit:cover}
 
@@ -1473,16 +1465,169 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
       if (isNightModeActive() && (o.nightAction || "black") === "black") return false;
       return titlesMode === "always" || !!(viz && viz.on);
     }
+    /* MilkDrop3's song-title motion (milkdropfs.cpp ShowSongTitleAnim), 1.7 s:
+         scale = 1.01 / (p^0.21 + 0.01)   starts ~100x and shrinks onto the screen
+         alpha = p^0.3
+         wobble: six sines per vertex, weight t2 = (max(0, 1 - 1.5p))^1.8 * 1.3
+       then the title is burned into the preset's feedback buffer, where the
+       preset's (audio-driven) warp smears it away. Here the crisp DOM text does
+       the fly-in per letter; Butterchurn's own title renderer does the burn-in
+       (patched to use this font). Over the slideshow there is no feedback
+       buffer, so the text holds, then fades. */
+    const TT_FLY = 1.7, TT_MAX_SCALE = 6;
+    let ttAnim = null, ttRaf = 0;
+    const ttTitleSize = n => n > 48 ? 0.06 : n > 30 ? 0.072 : n > 16 ? 0.084 : 0.10;   // fraction of the screen
+
+    function ttFill(el, text){
+      // Words as nowrap spans of per-letter spans; spaces stay text so lines can wrap.
+      el.textContent = "";
+      text.split(/(\s+)/).forEach(part=>{
+        if (!part) return;
+        if (/^\s+$/.test(part)) { el.appendChild(document.createTextNode(" ")); return; }
+        const w = document.createElement("span"); w.className = "w";
+        for (const ch of part){ const c = document.createElement("span"); c.className = "c"; c.textContent = ch; w.appendChild(c); }
+        el.appendChild(w);
+      });
+    }
+
     function popTitle(force){
       const np = nowPlaying;
       if (!np || !np.title || (!force && !titlesWanted())) return;
-      ttTitle.textContent = np.title;
-      ttArtist.textContent = np.artist || "";
-      // Long titles get smaller type so they stay inside the circle.
-      const n = np.title.length;
-      ttEl.style.setProperty("--tt-size", n > 48 ? "6vmin" : n > 30 ? "7.2vmin" : n > 16 ? "8.4vmin" : "10vmin");
-      ttEl.classList.remove("pop"); void ttEl.offsetWidth;   // restart the animation
-      ttEl.classList.add("pop");
+      const title = np.title.length > 90 ? np.title.slice(0, 88) + "…" : np.title;
+      const artist = np.artist || "";
+      ttFill(ttTitle, title);
+      ttFill(ttArtist, artist);
+      const size = ttTitleSize(title.length);
+      ttEl.style.setProperty("--tt-size", (size * 100) + "vmin");
+      // Measure each letter's resting spot (screen units, centre 0, edges ±1) for the wobble phase.
+      ttEl.style.transform = "translate(-50%,-50%)";
+      ttEl.style.opacity = "0"; ttEl.style.visibility = "visible";
+      const st = stage.getBoundingClientRect(), half = Math.min(st.width, st.height) / 2;
+      const cx = st.left + st.width / 2, cy = st.top + st.height / 2;
+      const chars = [...ttEl.querySelectorAll(".c")].map(el=>{
+        const r = el.getBoundingClientRect();
+        return { el, x: (r.left + r.width / 2 - cx) / half, y: (cy - (r.top + r.height / 2)) / half };
+      });
+      // Over the visualizer, have Butterchurn burn the same text into its feedback at the end.
+      const burn = !!(viz && viz.on && viz.engine) && vizLaunchTitle({ title, artist, size });
+      ttAnim = { start: performance.now(), chars, half, burn, pulse: 0 };
+      if (!ttRaf) ttRaf = requestAnimationFrame(ttStep);
+    }
+
+    function ttEnd(){
+      ttAnim = null; ttRaf = 0;
+      ttEl.style.visibility = "hidden"; ttEl.style.opacity = "0";
+    }
+
+    function ttStep(now){
+      const a = ttAnim;
+      if (!a){ ttRaf = 0; return; }
+      const t = (now - a.start) / 1000, p = t / TT_FLY;
+      let scale = 1, alpha = 1, t2 = 0;
+      if (p < 1){
+        scale = Math.min(TT_MAX_SCALE, 1.01 / (Math.pow(Math.max(p, 1e-6), 0.21) + 0.01));
+        alpha = Math.pow(p, 0.3);
+        t2 = Math.pow(Math.max(0, 1 - p * 1.5), 1.8) * 1.3;
+      } else {
+        // Burned in: hand over quickly. Slideshow: hold, then fade.
+        const after = t - TT_FLY, hold = a.burn ? 0 : 2.6, fade = a.burn ? 0.35 : 1.1;
+        if (after > hold + fade){ ttEnd(); return; }
+        if (after > hold) alpha = 1 - (after - hold) / fade;
+      }
+      // Bass pulse over the visualizer: a small kick in size with the low end.
+      if (viz && viz.on && viz.levels){
+        const b = viz.levels.timeByteArray; let s = 0;
+        for (let i = 0; i < b.length; i += 4){ const d = b[i] - 128; s += d * d; }
+        const rms = Math.sqrt(s / (b.length / 4)) / 128;
+        a.pulse = Math.max(rms, a.pulse * 0.82);
+        scale *= 1 + 0.07 * Math.min(1, a.pulse * 2.5);
+      }
+      ttEl.style.opacity = String(alpha);
+      ttEl.style.transform = `translate(-50%,-50%) scale(${scale})`;
+      const T = now / 1000;
+      for (const c of a.chars){
+        if (t2 <= 0){ if (c.moved){ c.el.style.transform = ""; c.moved = false; } continue; }
+        const x = c.x, y = c.y;
+        const dx = t2 * (0.070 * Math.sin(T * 0.31 + x * 0.39 - y * 1.94)
+                       + 0.044 * Math.sin(T * 0.81 - x * 1.91 + y * 0.27)
+                       + 0.061 * Math.sin(T * 1.31 + x * 0.61 + y * 0.74));
+        const dy = t2 * (0.061 * Math.sin(T * 0.37 + x * 1.83 + y * 0.69)
+                       + 0.070 * Math.sin(T * 0.67 + x * 0.42 - y * 1.39)
+                       + 0.087 * Math.sin(T * 1.07 + x * 3.55 + y * 0.89));
+        c.el.style.transform = `translate(${dx * a.half}px,${-dy * a.half}px)`;
+        c.moved = true;
+      }
+      ttRaf = requestAnimationFrame(ttStep);
+    }
+
+    /* Butterchurn's TitleText is MilkDrop's: drawn over the screen while it flies
+       in, then into the feedback buffer once progress reaches 1. Keep only the
+       burn-in (the DOM text does the fly-in) and draw its texture in our font,
+       laid out like the DOM text so the hand-over lines up. */
+    function vizPatchTitle(){
+      const r = viz.engine && viz.engine.renderer, tt = r && r.titleText;
+      if (!tt || typeof tt.renderTitle !== "function") return false;
+      if (tt.__kraken) return true;
+      const draw = tt.renderTitle.bind(tt);
+      tt.renderTitle = (progress, flip, g) => { if (progress >= 1 && flip) draw(progress, flip, g); };
+      const S = 512, cv = document.createElement("canvas"); cv.width = cv.height = S;
+      const g2 = cv.getContext("2d");
+      tt.generateTitleTexture = () => {
+        const spec = viz.titleSpec || { title: "", artist: "", size: 0.1 };
+        g2.setTransform(1, 0, 0, 1, 0, 0);
+        g2.clearRect(0, 0, S, S);
+        // The title mesh samples the middle 75% of the texture's height across the
+        // whole screen, so draw in screen space squashed into that band.
+        g2.setTransform(1, 0, 0, 0.75, 0, 0.125 * S);
+        const tSize = spec.size * S, aSize = 0.052 * S, maxW = 0.76 * S;
+        const wrap = (text, font) => {
+          g2.font = font;
+          const lines = []; let line = "";
+          for (const word of text.split(/\s+/).filter(Boolean)){
+            const tryLine = line ? line + " " + word : word;
+            if (line && g2.measureText(tryLine).width > maxW){ lines.push(line); line = word; } else line = tryLine;
+          }
+          if (line) lines.push(line);
+          return lines;
+        };
+        const tFont = `800 ${tSize}px "Segoe UI", system-ui, sans-serif`;
+        const aFont = `500 ${aSize}px "Segoe UI", system-ui, sans-serif`;
+        const tLines = wrap(spec.title, tFont);
+        const aLines = spec.artist ? [spec.artist] : [];
+        const tLH = tSize * 1.08, aLH = aSize * 1.08, gap = aLines.length ? 0.016 * S : 0;
+        let y = S / 2 - (tLines.length * tLH + gap + aLines.length * aLH) / 2;
+        g2.textAlign = "center"; g2.textBaseline = "middle"; g2.fillStyle = "#fff";
+        g2.shadowColor = "rgba(0,0,0,0.85)"; g2.shadowBlur = S * 0.012;
+        g2.font = tFont; for (const l of tLines){ g2.fillText(l, S / 2, y + tLH / 2); y += tLH; }
+        y += gap;
+        g2.font = aFont; g2.globalAlpha = 0.85;
+        for (const l of aLines){ g2.fillText(l, S / 2, y + aLH / 2); y += aLH; }
+        g2.globalAlpha = 1;
+        const gl = tt.gl;
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+        gl.bindTexture(gl.TEXTURE_2D, tt.textTexture);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, cv);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.generateMipmap(gl.TEXTURE_2D);
+        gl.bindTexture(gl.TEXTURE_2D, null);
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+      };
+      tt.__kraken = true;
+      return true;
+    }
+
+    window.krakenDebug = { get viz(){ return viz; }, popTitle };   // for poking at it from devtools
+
+    function vizLaunchTitle(spec){
+      try {
+        if (!vizPatchTitle()) return false;
+        viz.titleSpec = spec;
+        viz.engine.launchSongTitleAnim(spec.title);
+        return true;
+      } catch (e) { return false; }
     }
     function onNowPlaying(msg){
       nowPlaying = { title: msg.title || "", artist: msg.artist || "", playing: !!msg.playing };
@@ -1504,7 +1649,7 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
     function handleRemoteCommand(cmd){
       if (!cmd || !cmd.action) return;
       // Any slideshow command leaves the visualizer first.
-      if (viz.on && !["visualizer", "night", "reload"].includes(cmd.action)) vizStop();
+      if (viz.on && !["visualizer", "night", "reload", "titles"].includes(cmd.action)) vizStop();
       switch (cmd.action){
         case "visualizer": {
           const m = cmd.mode || "on";
@@ -1583,7 +1728,7 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
           if (cmd.mode === "show") { popTitle(true); break; }
           titlesMode = cmd.mode;
           try { localStorage.setItem("krakenTitles", titlesMode); } catch {}
-          if (titlesMode === "off") ttEl.classList.remove("pop");
+          if (titlesMode === "off" && ttAnim) ttEnd();
           break;
       }
       reportState();

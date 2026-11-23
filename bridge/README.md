@@ -114,9 +114,15 @@ whatever the PC is playing. Any slideshow command (`slideshow`, `next`,
 
 ### Track titles
 
-When the track changes, its title and artist pop up in the middle of the screen
-and fade out, like MilkDrop's song titles. They also appear a moment after the
-visualizer starts. The track comes from Windows' media controls (whatever shows
+When the track changes, its title and artist fly onto the screen the way
+MilkDrop3 does it (ported from its `ShowSongTitleAnim`): over 1.7 s the text
+shrinks from about 6x onto the screen while fading in (`p^0.3`) and wobbling
+letter by letter (MilkDrop's six-sine warp, settling by two-thirds of the way),
+with a small kick from the bass. Over the visualizer it is then **burned into
+the preset's feedback buffer** (Butterchurn's own title renderer, patched to
+use the same font), so the preset's audio-driven warp smears and dissolves it.
+Over the slideshow it holds for a few seconds and fades. Titles also appear a
+moment after the visualizer starts. The track comes from Windows' media controls (whatever shows
 in the volume flyout: Spotify, YouTube Music, a browser tab…), read by
 `kraken-nowplaying.ps1`, which the bridge runs hidden while a page is connected.
 It needs nothing installed.
@@ -164,6 +170,7 @@ discovery. Nothing needs setting up in HA.
 |---|---|
 | `button.kraken_lcd_next` / `_prev` / `_hold` / `_slideshow` / `_reload` | The matching command |
 | `button.kraken_lcd_viz_next` / `_viz_random` | Change visualizer preset |
+| `button.kraken_lcd_title_show` | Pop the current track title now |
 | `switch.kraken_lcd_visualizer` | Visualizer on/off |
 | `select.kraken_lcd_preset` | Start the visualizer on a chosen preset (all names listed) |
 | `select.kraken_lcd_night` | Night mode: `auto` (schedule), `on`, `off` |

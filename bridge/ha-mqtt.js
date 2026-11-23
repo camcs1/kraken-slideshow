@@ -60,6 +60,7 @@ module.exports = function startHaMqtt(opts) {
     button("reload", "Reload page", "mdi:refresh", "reload");
     button("viz_next", "Next preset", "mdi:skip-forward-outline", "visualizer next");
     button("viz_random", "Random preset", "mdi:shuffle-variant", "visualizer random");
+    button("title_show", "Show track title", "mdi:format-title", "titles show");
 
     out.push(["switch", "visualizer", common("switch", "visualizer", "Visualizer", {
       icon: "mdi:music-circle",

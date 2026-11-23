@@ -40,8 +40,9 @@ An optional local **bridge**, run by a small **tray app**, adds remote control
   (100 presets), driven by the PC's system audio.
 - Next / previous / random preset, or start on a preset by name.
 - Adjustable render size and frame cap, because CAM renders WebGL on the CPU.
-- **Track titles**: the song title pops up and fades when the track changes,
-  like MilkDrop, read from Windows' media controls.
+- **Track titles**: on a track change the song title flies in with MilkDrop3's
+  motion, then burns into the visualizer so the preset dissolves it to the music.
+  Read from Windows' media controls.
 
 ---
 
