@@ -1999,6 +1999,7 @@ https://example.com/door.jpg {&quot;name&quot;:&quot;Front Door&quot;, &quot;sec
         paused, editMode, night: isNightModeActive(), nightOverride,
         view: vizOn ? null : lastVisual,
         titles: titlesMode || "visualizer",
+        interval: o.interval,
         visualizer: viz ? { on: vizOn, preset: viz.name, fps: viz.fps, maxFps: viz.maxFps, res: viz.res,
                             audio: vizOn && performance.now() - viz.audioAt < 1000,
                             presets: viz.keys.length, error: viz.error,
@@ -2529,7 +2530,7 @@ OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     function handleRemoteCommand(cmd){
       if (!cmd || !cmd.action) return;
       // Any slideshow command leaves the visualizer first.
-      if (viz.on && !["visualizer", "night", "reload", "titles"].includes(cmd.action)) vizStop();
+      if (viz.on && !["visualizer", "night", "reload", "titles", "interval"].includes(cmd.action)) vizStop();
       switch (cmd.action){
         case "visualizer": {
           const m = cmd.mode || "on";
@@ -2617,6 +2618,24 @@ OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
           remoteSrc = cmd.url;
           if (cmd.seconds > 0){
             holdTimer = setTimeout(()=>{ holdTimer = null; remoteSrc = null; render(); }, cmd.seconds * 1000);
+          }
+          break;
+        }
+        case "interval": {
+          // Global "show each image for" time, saved where the Configure page keeps it.
+          const sec = clamp(Math.round(Number(cmd.seconds)), 1, 3600);
+          if (!Number.isFinite(sec)) break;
+          o.interval = sec;
+          try {
+            const saved = JSON.parse(localStorage.getItem(K_OPTIONS) || "{}");
+            saved.interval = sec;
+            localStorage.setItem(K_OPTIONS, JSON.stringify(saved));
+          } catch {}
+          // Restart the running image's countdown with the new time (items with their own seconds keep theirs).
+          const cur = items[idx];
+          if (timer && !editMode && !paused && !remoteSrc && !viz.on && cur && cur.type !== "video" && !cur.seconds){
+            clearTimer();
+            timer = setTimeout(next, sec * 1000);
           }
           break;
         }

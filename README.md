@@ -134,6 +134,7 @@ to `http://127.0.0.1:27880/…`, or published over MQTT to `kraken/<pc name>/com
 | `visualizer next` / `prev` / `random` | Change preset |
 | `visualizer res 256` / `fps 20` | Tune render size / frame cap |
 | `titles visualizer` / `always` / `off` / `show` | When the track title pops up on screen |
+| `interval 30` | Seconds each image shows (saved, same as the Configure page setting) |
 | `reload` | Reload the Kraken page (picks up a new `index.html`) |
 
 ### Home Assistant

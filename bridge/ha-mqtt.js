@@ -128,6 +128,13 @@ module.exports = function startHaMqtt(opts) {
       json_attributes_topic: `${base}/state`,
       json_attributes_template: "{{ {'favourites': value_json.viz_favorites, 'names': value_json.viz_favorite_names | default([])} | tojson }}",
     })]);
+    out.push(["number", "interval", common("number", "interval", "Slideshow interval", {
+      icon: "mdi:timer-outline",
+      min: 1, max: 3600, step: 1, mode: "box", unit_of_measurement: "s",
+      command_topic: `${base}/interval/set`,
+      state_topic: `${base}/state`,
+      value_template: stateTpl("interval"),
+    })]);
     out.push(["select", "titles", common("select", "titles", "Track titles", {
       icon: "mdi:music-note-eighth",
       options: ["visualizer", "always", "off"],
@@ -212,6 +219,7 @@ module.exports = function startHaMqtt(opts) {
     else if (topic === `${base}/visualizer/set`) cmd = { action: "visualizer", mode: text.toUpperCase() === "ON" ? "on" : "off" };
     else if (topic === `${base}/night/set`) cmd = { action: "night", mode: text.toLowerCase() };
     else if (topic === `${base}/titles/set`) cmd = { action: "titles", mode: text.toLowerCase() };
+    else if (topic === `${base}/interval/set`) cmd = { action: "interval", seconds: Math.round(Number(text)) };
     else if (topic === `${base}/viz_pack/set`) {
       const id = Object.keys(PACK_LABELS).find(k => PACK_LABELS[k] === text) || text.toLowerCase();
       cmd = { action: "visualizer", mode: "pack", value: id };
@@ -318,7 +326,7 @@ module.exports = function startHaMqtt(opts) {
       log(`mqtt: connected to ${host}:${port} as ${username || "(anonymous)"}`);
       publish(`${base}/status`, "online", true);
       subscribe([`${base}/command`, `${base}/visualizer/set`, `${base}/night/set`,
-                 `${base}/preset/set`, `${base}/pick/set`, `${base}/titles/set`,
+                 `${base}/preset/set`, `${base}/pick/set`, `${base}/titles/set`, `${base}/interval/set`,
                  `${base}/viz_pack/set`, `${base}/viz_cycle/set`, `${base}/viz_order/set`,
                  `${base}/viz_blend/set`, `${base}/viz_ontrack/set`, `${base}/viz_fav/set`, `${disc}/status`]);
       publishDiscovery();

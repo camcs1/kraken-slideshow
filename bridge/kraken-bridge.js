@@ -26,6 +26,7 @@
  *                   node kraken-bridge.js send visualizer ontrack on|off
  *                   node kraken-bridge.js send visualizer fav [on|off|toggle]   (current preset)
  *                   node kraken-bridge.js send titles visualizer|always|off|show
+ *                   node kraken-bridge.js send interval 30   (seconds per image)
  *                   node kraken-bridge.js status
  *                   node kraken-bridge.js presets
  *                   node kraken-bridge.js playlist [names]
@@ -45,7 +46,7 @@ const HOST = process.env.KRAKEN_BRIDGE_HOST || "127.0.0.1";
 const PORT = Number(process.env.KRAKEN_BRIDGE_PORT || 27880);
 const AUDIO_PORT = Number(process.env.KRAKEN_AUDIO_PORT || 27881);       // UDP from kraken-audio.py
 const PYTHON = process.env.KRAKEN_PYTHON || "python";
-const ACTIONS = new Set(["next", "prev", "pause", "resume", "slideshow", "pick", "hold", "show", "goto", "night", "reload", "visualizer", "titles"]);
+const ACTIONS = new Set(["next", "prev", "pause", "resume", "slideshow", "pick", "hold", "show", "goto", "night", "reload", "visualizer", "titles", "interval"]);
 const VIZ_MODES = ["on", "off", "next", "prev", "random", "res", "fps", "pack", "cycle", "order", "blend", "ontrack", "fav"];
 const VIZ_PACKS = ["default", "extra", "extra2", "md1", "minimal", "weekly", "all", "favorites"];
 const TITLE_MODES = ["visualizer", "always", "off", "show"];   // when the page pops the track title
@@ -71,6 +72,7 @@ function cliArgsToCommand([action, ...rest]) {
     case "pick":  return /^\d+$/.test(text) ? { action, index: Number(text) } : { action, name: text };
     case "night": return { action, mode: (rest[0] || "auto").toLowerCase() };
     case "titles": return { action, mode: (rest[0] || "show").toLowerCase() };
+    case "interval": return { action, seconds: Number(rest[0]) };
     case "visualizer": {
       const mode = (rest[0] || "on").toLowerCase();
       const arg = rest.slice(1).join(" ").trim();
@@ -333,6 +335,7 @@ function startServer() {
       fps: vizOn ? v.fps : 0,
       presets: presets || [],
       titles: s && s.titles ? s.titles : "visualizer",
+      interval: s && typeof s.interval === "number" ? s.interval : null,
       viz_pack: v && v.pack ? v.pack : "default",
       viz_cycle: v && typeof v.cycle === "number" ? v.cycle : 0,
       viz_order: v && v.order ? v.order : "random",
@@ -423,6 +426,8 @@ function validate(cmd) {
   if (cmd.action === "pick" && !Number.isInteger(cmd.index) && !String(cmd.name || "").trim())
     return "pick needs a name or an integer index";
   if (cmd.action === "night" && !["on", "off", "auto"].includes(cmd.mode)) return "night mode must be on, off or auto";
+  if (cmd.action === "interval" && !(Number.isInteger(cmd.seconds) && cmd.seconds >= 1 && cmd.seconds <= 3600))
+    return "interval needs whole seconds from 1 to 3600";
   if (cmd.action === "titles" && !TITLE_MODES.includes(cmd.mode)) return `titles must be one of: ${TITLE_MODES.join(", ")}`;
   if (cmd.action === "visualizer") {
     cmd.mode = cmd.mode || "on";

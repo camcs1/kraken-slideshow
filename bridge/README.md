@@ -186,6 +186,7 @@ discovery. Nothing needs setting up in HA.
 | `select.kraken_lcd_preset` | Start the visualizer on a chosen preset (all names listed) |
 | `select.kraken_lcd_night` | Night mode: `auto` (schedule), `on`, `off` |
 | `select.kraken_lcd_titles` | Track titles: `visualizer`, `always`, `off` |
+| `number.kraken_lcd_interval` | Slideshow: seconds each image shows (the Configure page's global time; items with their own time keep it) |
 | `select.kraken_lcd_viz_pack` | Preset pack (Default, Extra, Extra 2, MilkDrop 1, Lightweight, Community weekly, All, Favourites) |
 | `number.kraken_lcd_viz_cycle` | Auto-change preset every N seconds (0 = off) |
 | `select.kraken_lcd_viz_order` | `random` or `sequential` |
