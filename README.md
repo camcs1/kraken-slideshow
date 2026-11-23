@@ -24,6 +24,7 @@ It supports images (`png`, `jpg`, `gif`, `webp`) and video (`mp4`, `webm`) with 
   - Zoom, X/Y offset, rotation
 - **Live Preview inside Configure**: Test the slideshow with current unsaved settings before saving.
 - **Device playback**: When opened with `?kraken=1`, the page runs on the Kraken LCD using saved settings.
+- **Remote control (optional)**: Run the small local bridge in [`bridge/`](bridge/README.md) to drive the screen from HASS.Agent / Home Assistant or PowerShell: next/prev, pause, push an image, force night mode.
 
 ---
 
