@@ -6,7 +6,7 @@
  * on screen is outlined, and "Back to slideshow" appears while one is held.
  *
  * Register as a dashboard resource (JavaScript module):
- *   https://camcs1.github.io/kraken-slideshow/ha/kraken-picker-card.js?v=2
+ *   https://camcs1.github.io/kraken-slideshow/ha/kraken-picker-card.js?v=3
  *
  *   type: custom:kraken-picker-card
  *   # all optional:
@@ -20,7 +20,7 @@
  *   mode_entity: sensor.kraken_lcd_mode
  *   slideshow_entity: button.kraken_lcd_slideshow
  */
-const KPC_VERSION = "1.1.0";
+const KPC_VERSION = "1.2.0";
 
 const KPC_DEFAULTS = {
   title: "Pick a picture",
@@ -229,6 +229,65 @@ class KrakenPickerCard extends HTMLElement {
     if (!this._hass || !entity_id) return;
     this._hass.callService(domain, service, Object.assign({ entity_id }, data || {}));
   }
+}
+
+/*
+ * Kraken screen card: the image on the LCD, drawn round like the pump screen.
+ *
+ *   type: custom:kraken-screen-card
+ *   entity: image.kraken_lcd_now   # optional
+ *   ring: true                     # thin ring around the circle
+ *
+ * Sized by the dashboard grid; the circle takes the largest square that fits.
+ */
+class KrakenScreenCard extends HTMLElement {
+  setConfig(config) {
+    this._config = Object.assign({ entity: "image.kraken_lcd_now", ring: true }, config || {});
+    if (this.shadowRoot) this._applyConfig();
+  }
+  static getStubConfig() { return {}; }
+  getCardSize() { return 3; }
+  getGridOptions() { return { columns: 6, rows: 2, min_rows: 2 }; }
+
+  set hass(hass) {
+    this._hass = hass;
+    if (!this.shadowRoot) {
+      this.attachShadow({ mode: "open" });
+      this.shadowRoot.innerHTML = `<style>
+          :host { display: block; height: 100%; }
+          ha-card { height: 100%; min-height: 112px; box-sizing: border-box; display: grid; place-items: center;
+            background: none; border: none; box-shadow: none; cursor: pointer; container-type: size; }
+          .screen { width: min(100cqw, 100cqh); aspect-ratio: 1; border-radius: 50%; overflow: hidden; position: relative;
+            background: #000; box-sizing: border-box; }
+          .screen.ring { box-shadow: 0 0 0 2px var(--divider-color, #444), 0 4px 14px rgba(0,0,0,.45); }
+          img { width: 100%; height: 100%; object-fit: cover; display: block; }
+          img[hidden] { display: none; }
+        </style>
+        <ha-card><div class="screen"><img alt="Kraken screen"></div></ha-card>`;
+      this._img = this.shadowRoot.querySelector("img");
+      this._screen = this.shadowRoot.querySelector(".screen");
+      this._img.addEventListener("error", () => { this._img.hidden = true; });
+      this.shadowRoot.querySelector("ha-card").addEventListener("click", () => {
+        this.dispatchEvent(new CustomEvent("hass-more-info", { bubbles: true, composed: true, detail: { entityId: this._config.entity } }));
+      });
+      this._applyConfig();
+    }
+    const st = hass.states[this._config.entity];
+    const pic = st && st.state !== "unavailable" ? st.attributes.entity_picture : null;
+    if (pic !== this._pic) {
+      this._pic = pic;
+      if (pic) { this._img.hidden = false; this._img.src = hass.hassUrl ? hass.hassUrl(pic) : pic; }
+      else { this._img.hidden = true; this._img.removeAttribute("src"); }
+    }
+  }
+
+  _applyConfig() { if (this._screen) this._screen.classList.toggle("ring", !!this._config.ring); }
+}
+
+if (!customElements.get("kraken-screen-card")) {
+  customElements.define("kraken-screen-card", KrakenScreenCard);
+  window.customCards = window.customCards || [];
+  window.customCards.push({ type: "kraken-screen-card", name: "Kraken screen", description: "What's on the Kraken LCD, drawn round.", preview: false });
 }
 
 if (!customElements.get("kraken-picker-card")) {
