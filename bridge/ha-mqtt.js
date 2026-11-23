@@ -25,6 +25,22 @@ const NO_PRESET = "—";           // placeholder option until presets are known
 const PACK_LABELS = { default: "Default", extra: "Extra", extra2: "Extra 2", md1: "MilkDrop 1",
                       minimal: "Lightweight", weekly: "Community weekly", all: "All", favorites: "Favourites" };
 
+// Slideshow interval dropdown: preset times, plus the current value if it's something else.
+const INTERVAL_PRESETS = [5, 10, 15, 30, 60, 120, 300, 600, 900, 1800, 3600];
+const intervalLabel = s => s % 3600 === 0 ? (s === 3600 ? "1 hour" : `${s / 3600} hours`)
+  : s % 60 === 0 ? `${s / 60} min` : `${s} s`;
+function intervalFromLabel(text) {
+  const m = /^(\d+(?:\.\d+)?)\s*(s|sec|seconds?|m|min|minutes?|h|hours?)?$/i.exec(String(text).trim());
+  if (!m) return NaN;
+  const u = (m[2] || "s").toLowerCase()[0];
+  return Math.round(Number(m[1]) * (u === "h" ? 3600 : u === "m" ? 60 : 1));
+}
+function intervalOptions(current) {
+  const secs = INTERVAL_PRESETS.slice();
+  if (Number.isInteger(current) && !secs.includes(current)) { secs.push(current); secs.sort((a, b) => a - b); }
+  return secs.map(intervalLabel);
+}
+
 module.exports = function startHaMqtt(opts) {
   const { host, port, username, password, nodeId, log, dispatch, textToCommand } = opts;
   const base = `kraken/${nodeId}`;
@@ -34,6 +50,7 @@ module.exports = function startHaMqtt(opts) {
   let sock = null, connected = false, lastError = null;
   let pingTimer = null, retryDelay = 2000, packetId = 1;
   let snap = null, lastStateJson = null, lastImage = null, lastPresetsKey = null, lastPlaylistJson = null;
+  let lastIntervalOptsKey = null;
 
   /* ------------------------------------------------------ HA entities */
   const device = {
@@ -135,6 +152,13 @@ module.exports = function startHaMqtt(opts) {
       state_topic: `${base}/state`,
       value_template: stateTpl("interval"),
     })]);
+    out.push(["select", "interval_preset", common("select", "interval_preset", "Slideshow interval preset", {
+      icon: "mdi:timer-outline",
+      options: intervalOptions(snap && snap.interval),
+      command_topic: `${base}/interval_preset/set`,
+      state_topic: `${base}/state`,
+      value_template: stateTpl("interval_option"),
+    })]);
     out.push(["select", "titles", common("select", "titles", "Track titles", {
       icon: "mdi:music-note-eighth",
       options: ["visualizer", "always", "off"],
@@ -186,12 +210,16 @@ module.exports = function startHaMqtt(opts) {
       publish(`${disc}/${component}/${uid}/${key}/config`, JSON.stringify(cfg), true);
     }
     lastPresetsKey = snap ? snap.presets.join("\n") : "";
+    lastIntervalOptsKey = intervalOptions(snap && snap.interval).join("\n");
   }
 
   function publishState(force) {
     if (!connected || !snap) return;
     const { presets, playlist, ...rest } = snap;
     rest.preset_option = presets.includes(snap.preset) ? snap.preset : NO_PRESET;
+    rest.interval_option = Number.isInteger(snap.interval) ? intervalLabel(snap.interval) : null;   // null -> "None" = unknown in HA
+    // A custom interval needs its own option, announced before the state that uses it.
+    if (intervalOptions(snap.interval).join("\n") !== lastIntervalOptsKey) publishDiscovery();
     const json = JSON.stringify(rest);
     if (force || json !== lastStateJson) { publish(`${base}/state`, json, true); lastStateJson = json; }
     // Playlist goes on its own retained topic, only when it changes (and never empty
@@ -219,6 +247,7 @@ module.exports = function startHaMqtt(opts) {
     else if (topic === `${base}/visualizer/set`) cmd = { action: "visualizer", mode: text.toUpperCase() === "ON" ? "on" : "off" };
     else if (topic === `${base}/night/set`) cmd = { action: "night", mode: text.toLowerCase() };
     else if (topic === `${base}/titles/set`) cmd = { action: "titles", mode: text.toLowerCase() };
+    else if (topic === `${base}/interval_preset/set`) cmd = { action: "interval", seconds: intervalFromLabel(text) };
     else if (topic === `${base}/interval/set`) cmd = { action: "interval", seconds: Math.round(Number(text)) };
     else if (topic === `${base}/viz_pack/set`) {
       const id = Object.keys(PACK_LABELS).find(k => PACK_LABELS[k] === text) || text.toLowerCase();
@@ -326,7 +355,7 @@ module.exports = function startHaMqtt(opts) {
       log(`mqtt: connected to ${host}:${port} as ${username || "(anonymous)"}`);
       publish(`${base}/status`, "online", true);
       subscribe([`${base}/command`, `${base}/visualizer/set`, `${base}/night/set`,
-                 `${base}/preset/set`, `${base}/pick/set`, `${base}/titles/set`, `${base}/interval/set`,
+                 `${base}/preset/set`, `${base}/pick/set`, `${base}/titles/set`, `${base}/interval/set`, `${base}/interval_preset/set`,
                  `${base}/viz_pack/set`, `${base}/viz_cycle/set`, `${base}/viz_order/set`,
                  `${base}/viz_blend/set`, `${base}/viz_ontrack/set`, `${base}/viz_fav/set`, `${disc}/status`]);
       publishDiscovery();
