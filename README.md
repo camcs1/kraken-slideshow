@@ -39,6 +39,8 @@ An optional local **bridge**, run by a small **tray app**, adds remote control
 - MilkDrop presets rendered with [Butterchurn](https://github.com/jberg/butterchurn)
   (100 presets), driven by the PC's system audio.
 - Next / previous / random preset, or start on a preset by name.
+- Preset packs (including the community's weekly picks), automatic changes on
+  a timer or on each new track, blend time, and a favourites playlist.
 - Adjustable render size and frame cap, because CAM renders WebGL on the CPU.
 - **Track titles**: on a track change the song title flies in with MilkDrop3's
   motion, then burns into the visualizer so the preset dissolves it to the music.

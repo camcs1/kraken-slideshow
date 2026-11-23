@@ -19,6 +19,12 @@
  *                   node kraken-bridge.js send visualizer on [preset words]
  *                   node kraken-bridge.js send visualizer next|prev|random|off
  *                   node kraken-bridge.js send visualizer res 480
+ *                   node kraken-bridge.js send visualizer pack default|extra|extra2|md1|minimal|weekly|all
+ *                   node kraken-bridge.js send visualizer cycle 30   (seconds; 0 = off)
+ *                   node kraken-bridge.js send visualizer order random|sequential
+ *                   node kraken-bridge.js send visualizer blend 2.7
+ *                   node kraken-bridge.js send visualizer ontrack on|off
+ *                   node kraken-bridge.js send visualizer fav [on|off|toggle]   (current preset)
  *                   node kraken-bridge.js send titles visualizer|always|off|show
  *                   node kraken-bridge.js status
  *                   node kraken-bridge.js presets
@@ -40,7 +46,8 @@ const PORT = Number(process.env.KRAKEN_BRIDGE_PORT || 27880);
 const AUDIO_PORT = Number(process.env.KRAKEN_AUDIO_PORT || 27881);       // UDP from kraken-audio.py
 const PYTHON = process.env.KRAKEN_PYTHON || "python";
 const ACTIONS = new Set(["next", "prev", "pause", "resume", "slideshow", "pick", "hold", "show", "goto", "night", "reload", "visualizer", "titles"]);
-const VIZ_MODES = ["on", "off", "next", "prev", "random", "res", "fps"];
+const VIZ_MODES = ["on", "off", "next", "prev", "random", "res", "fps", "pack", "cycle", "order", "blend", "ontrack", "fav"];
+const VIZ_PACKS = ["default", "extra", "extra2", "md1", "minimal", "weekly", "all", "favorites"];
 const TITLE_MODES = ["visualizer", "always", "off", "show"];   // when the page pops the track title
 
 /* ------------------------------------------------------------------ CLI */
@@ -67,7 +74,9 @@ function cliArgsToCommand([action, ...rest]) {
     case "visualizer": {
       const mode = (rest[0] || "on").toLowerCase();
       const arg = rest.slice(1).join(" ").trim();
-      if (mode === "res" || mode === "fps") return { action, mode, value: Number(arg) };
+      if (mode === "res" || mode === "fps" || mode === "cycle" || mode === "blend") return { action, mode, value: Number(arg) };
+      if (mode === "pack" || mode === "order" || mode === "ontrack") return { action, mode, value: arg.toLowerCase() };
+      if (mode === "fav") return { action, mode, value: (arg || "toggle").toLowerCase() };
       return arg ? { action, mode, preset: arg } : { action, mode };
     }
     default:      return { action };
@@ -276,7 +285,7 @@ function startServer() {
 
     if (cmd.action === "visualizer") {
       if (cmd.mode === "off") stopAudio();
-      else if (cmd.mode !== "res" && cmd.mode !== "fps") startAudio();
+      else if (!["res", "fps", "pack", "cycle", "order", "blend", "ontrack", "fav"].includes(cmd.mode)) startAudio();   // settings don't start it
     }
 
     broadcast(clients, cmd);
@@ -324,6 +333,13 @@ function startServer() {
       fps: vizOn ? v.fps : 0,
       presets: presets || [],
       titles: s && s.titles ? s.titles : "visualizer",
+      viz_pack: v && v.pack ? v.pack : "default",
+      viz_cycle: v && typeof v.cycle === "number" ? v.cycle : 0,
+      viz_order: v && v.order ? v.order : "random",
+      viz_blend: v && typeof v.blend === "number" ? v.blend : 2.7,
+      viz_ontrack: !!(v && v.onTrack),
+      viz_fav: !!(v && v.favorite),
+      viz_favorites: v && typeof v.favorites === "number" ? v.favorites : 0,
       track: nowPlaying.title ? (nowPlaying.artist ? `${nowPlaying.artist} – ${nowPlaying.title}` : nowPlaying.title) : "",
       track_playing: nowPlaying.playing,
       playlist: (playlist || []).map(p => ({ name: p.name, src: p.src, type: p.type })),
@@ -412,6 +428,12 @@ function validate(cmd) {
     if (!VIZ_MODES.includes(cmd.mode)) return `visualizer mode must be one of: ${VIZ_MODES.join(", ")}`;
     if (cmd.mode === "res" && !(cmd.value >= 128 && cmd.value <= 1024)) return "visualizer res needs a size from 128 to 1024";
     if (cmd.mode === "fps" && !(cmd.value >= 5 && cmd.value <= 60)) return "visualizer fps needs a rate from 5 to 60";
+    if (cmd.mode === "cycle" && !(cmd.value >= 0 && cmd.value <= 3600)) return "visualizer cycle needs seconds from 0 (off) to 3600";
+    if (cmd.mode === "blend" && !(cmd.value >= 0 && cmd.value <= 10)) return "visualizer blend needs seconds from 0 to 10";
+    if (cmd.mode === "pack" && !VIZ_PACKS.includes(cmd.value)) return `visualizer pack must be one of: ${VIZ_PACKS.join(", ")}`;
+    if (cmd.mode === "order" && !["random", "sequential"].includes(cmd.value)) return "visualizer order must be random or sequential";
+    if (cmd.mode === "ontrack" && !["on", "off"].includes(cmd.value)) return "visualizer ontrack must be on or off";
+    if (cmd.mode === "fav" && !["on", "off", "toggle"].includes(cmd.value || "toggle")) return "visualizer fav must be on, off or toggle";
   }
   return null;
 }

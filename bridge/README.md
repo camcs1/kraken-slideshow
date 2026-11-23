@@ -109,7 +109,18 @@ whatever the PC is playing. Any slideshow command (`slideshow`, `next`,
 | `visualizer next` / `prev` / `random` | Change preset (2.7 s blend) |
 | `visualizer res 256` | Internal render size, 128–1024 (default 192; scaled up to the LCD) |
 | `visualizer fps 20` | Frame cap, 5–60 (default none) |
+| `visualizer pack <id>` | Preset pack: `default`, `extra`, `extra2`, `md1` (MilkDrop 1 classics), `minimal` (lighter on the CPU), `weekly` (community picks, 552 presets downloaded one at a time), `all` (default + extras + MD1), `favorites` |
+| `visualizer cycle 30` | Change preset automatically every N seconds (`0` = off, the default) |
+| `visualizer order random\|sequential` | How the automatic and on-track changes pick the next preset |
+| `visualizer blend 2.7` | Seconds to blend between presets, 0–10 |
+| `visualizer ontrack on\|off` | New preset when the track changes (the title then burns into the new one) |
+| `visualizer fav [on\|off]` | Add or remove the preset on screen from your favourites (no argument toggles) |
 | `visualizer off` | Back to the slideshow |
+
+The pack, timing, order, blend and favourites are saved on the Kraken page.
+Favourites remember which pack they came from, so the **Favourites** pack can
+mix presets from any pack, community ones included. Blending runs both presets
+at once, so long blends cost CPU for that time.
 | `presets` (CLI) / `/presets` | Preset names (loaded in the background once the page connects) |
 
 ### Track titles
@@ -175,6 +186,12 @@ discovery. Nothing needs setting up in HA.
 | `select.kraken_lcd_preset` | Start the visualizer on a chosen preset (all names listed) |
 | `select.kraken_lcd_night` | Night mode: `auto` (schedule), `on`, `off` |
 | `select.kraken_lcd_titles` | Track titles: `visualizer`, `always`, `off` |
+| `select.kraken_lcd_viz_pack` | Preset pack (Default, Extra, Extra 2, MilkDrop 1, Lightweight, Community weekly, All, Favourites) |
+| `number.kraken_lcd_viz_cycle` | Auto-change preset every N seconds (0 = off) |
+| `select.kraken_lcd_viz_order` | `random` or `sequential` |
+| `number.kraken_lcd_viz_blend` | Blend time between presets |
+| `switch.kraken_lcd_viz_ontrack` | New preset on track change |
+| `switch.kraken_lcd_viz_fav` | The preset on screen is a favourite (toggle to add/remove) |
 | `text.kraken_lcd_pick` | Hold an item by number (1-based, as the Position sensor shows) or name |
 | `sensor.kraken_lcd_mode` | `slideshow`, `picked`, `paused`, `remote`, `visualizer`, `disconnected` |
 | `sensor.kraken_lcd_position` | `20 / 56`, or the preset and fps in visualizer mode |

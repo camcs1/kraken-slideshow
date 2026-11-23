@@ -21,6 +21,9 @@ const net = require("net");
 
 const KEEPALIVE = 30;            // seconds
 const NO_PRESET = "—";           // placeholder option until presets are known
+// Visualizer preset packs (ids match the page's VIZ_PACKS) and their names in HA.
+const PACK_LABELS = { default: "Default", extra: "Extra", extra2: "Extra 2", md1: "MilkDrop 1",
+                      minimal: "Lightweight", weekly: "Community weekly", all: "All", favorites: "Favourites" };
 
 module.exports = function startHaMqtt(opts) {
   const { host, port, username, password, nodeId, log, dispatch, textToCommand } = opts;
@@ -81,6 +84,49 @@ module.exports = function startHaMqtt(opts) {
       command_topic: `${base}/preset/set`,
       state_topic: `${base}/state`,
       value_template: stateTpl("preset_option"),
+    })]);
+    // Visualizer settings (saved on the Kraken page).
+    out.push(["select", "viz_pack", common("select", "viz_pack", "Preset pack", {
+      icon: "mdi:folder-music",
+      options: Object.values(PACK_LABELS),
+      command_topic: `${base}/viz_pack/set`,
+      state_topic: `${base}/state`,
+      value_template: `{{ ${JSON.stringify(PACK_LABELS)}.get(value_json.viz_pack, 'Default') }}`,
+    })]);
+    out.push(["number", "viz_cycle", common("number", "viz_cycle", "Auto-change preset every", {
+      icon: "mdi:timer-sync-outline",
+      min: 0, max: 600, step: 5, mode: "box", unit_of_measurement: "s",
+      command_topic: `${base}/viz_cycle/set`,
+      state_topic: `${base}/state`,
+      value_template: stateTpl("viz_cycle"),
+    })]);
+    out.push(["select", "viz_order", common("select", "viz_order", "Preset order", {
+      icon: "mdi:shuffle-variant",
+      options: ["random", "sequential"],
+      command_topic: `${base}/viz_order/set`,
+      state_topic: `${base}/state`,
+      value_template: stateTpl("viz_order"),
+    })]);
+    out.push(["number", "viz_blend", common("number", "viz_blend", "Preset blend time", {
+      icon: "mdi:transition",
+      min: 0, max: 10, step: 0.5, mode: "slider", unit_of_measurement: "s",
+      command_topic: `${base}/viz_blend/set`,
+      state_topic: `${base}/state`,
+      value_template: stateTpl("viz_blend"),
+    })]);
+    out.push(["switch", "viz_ontrack", common("switch", "viz_ontrack", "New preset on track change", {
+      icon: "mdi:music-note-plus",
+      command_topic: `${base}/viz_ontrack/set`,
+      state_topic: `${base}/state`,
+      value_template: "{{ 'ON' if value_json.viz_ontrack else 'OFF' }}",
+    })]);
+    out.push(["switch", "viz_fav", common("switch", "viz_fav", "Favourite preset", {
+      icon: "mdi:star",
+      command_topic: `${base}/viz_fav/set`,
+      state_topic: `${base}/state`,
+      value_template: "{{ 'ON' if value_json.viz_fav else 'OFF' }}",
+      json_attributes_topic: `${base}/state`,
+      json_attributes_template: "{{ {'favourites': value_json.viz_favorites} | tojson }}",
     })]);
     out.push(["select", "titles", common("select", "titles", "Track titles", {
       icon: "mdi:music-note-eighth",
@@ -166,6 +212,15 @@ module.exports = function startHaMqtt(opts) {
     else if (topic === `${base}/visualizer/set`) cmd = { action: "visualizer", mode: text.toUpperCase() === "ON" ? "on" : "off" };
     else if (topic === `${base}/night/set`) cmd = { action: "night", mode: text.toLowerCase() };
     else if (topic === `${base}/titles/set`) cmd = { action: "titles", mode: text.toLowerCase() };
+    else if (topic === `${base}/viz_pack/set`) {
+      const id = Object.keys(PACK_LABELS).find(k => PACK_LABELS[k] === text) || text.toLowerCase();
+      cmd = { action: "visualizer", mode: "pack", value: id };
+    }
+    else if (topic === `${base}/viz_cycle/set`) cmd = { action: "visualizer", mode: "cycle", value: Number(text) };
+    else if (topic === `${base}/viz_order/set`) cmd = { action: "visualizer", mode: "order", value: text.toLowerCase() };
+    else if (topic === `${base}/viz_blend/set`) cmd = { action: "visualizer", mode: "blend", value: Number(text) };
+    else if (topic === `${base}/viz_fav/set`) cmd = { action: "visualizer", mode: "fav", value: text.toUpperCase() === "ON" ? "on" : "off" };
+    else if (topic === `${base}/viz_ontrack/set`) cmd = { action: "visualizer", mode: "ontrack", value: text.toUpperCase() === "ON" ? "on" : "off" };
     else if (topic === `${base}/preset/set`) { if (text && text !== NO_PRESET) cmd = { action: "visualizer", mode: "on", preset: text }; }
     else if (topic === `${base}/pick/set`) {
       if (!text) return;
@@ -263,7 +318,9 @@ module.exports = function startHaMqtt(opts) {
       log(`mqtt: connected to ${host}:${port} as ${username || "(anonymous)"}`);
       publish(`${base}/status`, "online", true);
       subscribe([`${base}/command`, `${base}/visualizer/set`, `${base}/night/set`,
-                 `${base}/preset/set`, `${base}/pick/set`, `${base}/titles/set`, `${disc}/status`]);
+                 `${base}/preset/set`, `${base}/pick/set`, `${base}/titles/set`,
+                 `${base}/viz_pack/set`, `${base}/viz_cycle/set`, `${base}/viz_order/set`,
+                 `${base}/viz_blend/set`, `${base}/viz_ontrack/set`, `${base}/viz_fav/set`, `${disc}/status`]);
       publishDiscovery();
       publishState(true);
       pingTimer = setInterval(() => send(Buffer.from([0xc0, 0])), (KEEPALIVE - 5) * 1000);

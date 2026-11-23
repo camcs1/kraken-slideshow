@@ -1296,7 +1296,10 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
         titles: titlesMode || "visualizer",
         visualizer: viz ? { on: vizOn, preset: viz.name, fps: viz.fps, maxFps: viz.maxFps, res: viz.res,
                             audio: vizOn && performance.now() - viz.audioAt < 1000,
-                            presets: viz.keys.length, error: viz.error } : null
+                            presets: viz.keys.length, error: viz.error,
+                            pack: vizSettings.pack, cycle: vizSettings.cycle, order: vizSettings.order,
+                            blend: vizSettings.blend, onTrack: vizSettings.onTrack,
+                            favorite: vizIsFav(viz.name), favorites: vizFavs.length } : null
       }});
     }
 
@@ -1306,10 +1309,30 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
        bridge/kraken-audio.py. The page never touches an audio input itself.
        CAM renders WebGL on the CPU (SwiftShader), so it draws at a reduced
        size (default 320px) and CSS scales it up to the LCD. */
-    const BUTTERCHURN_URLS = [
-      "https://cdn.jsdelivr.net/npm/butterchurn@2.6.7/lib/butterchurn.min.js",
-      "https://cdn.jsdelivr.net/npm/butterchurn-presets@2.4.7/lib/butterchurnPresets.min.js"
-    ];
+    const BUTTERCHURN_URL = "https://cdn.jsdelivr.net/npm/butterchurn@2.6.7/lib/butterchurn.min.js";
+    // Preset packs. butterchurn-presets ships several; "weekly" is the community's
+    // weekly picks (a name -> preset-JSON URL index; each preset is fetched when used).
+    const BCP = "https://cdn.jsdelivr.net/npm/butterchurn-presets@2.4.7/lib/";
+    const VIZ_PACKS = {
+      default:  { label:"Default",          script: BCP + "butterchurnPresets.min.js",        global:"butterchurnPresets" },
+      extra:    { label:"Extra",            script: BCP + "butterchurnPresetsExtra.min.js",   global:"butterchurnPresetsExtra" },
+      extra2:   { label:"Extra 2",          script: BCP + "butterchurnPresetsExtra2.min.js",  global:"butterchurnPresetsExtra2" },
+      md1:      { label:"MilkDrop 1",       script: BCP + "butterchurnPresetsMD1.min.js",     global:"butterchurnPresetsMD1" },
+      minimal:  { label:"Lightweight",      script: BCP + "butterchurnPresetsMinimal.min.js", global:"butterchurnPresetsMinimal" },
+      weekly:   { label:"Community weekly", index: "https://cdn.jsdelivr.net/npm/butterchurn-presets-weekly@0.0.4/weeks/presets.json" },
+      all:      { label:"All",              packs: ["default", "extra", "extra2", "md1"] },
+      favorites:{ label:"Favourites",       favorites: true },
+    };
+    // Favourites: [{ name, pack, url? }], pack = the pack it came from (url for community ones).
+    let vizFavs = [];
+    try { vizFavs = JSON.parse(localStorage.getItem("krakenVizFav") || "[]").filter(f=>f && f.name && f.pack); } catch {}
+    const vizPresetOrigin = {};   // preset name -> concrete pack id it was loaded from
+    // Visualizer settings, saved on the Kraken page (like the titles mode).
+    const VIZ_DEFAULTS = { pack:"default", cycle:0, order:"random", blend:2.7, onTrack:false };
+    let vizSettings = { ...VIZ_DEFAULTS };
+    try { Object.assign(vizSettings, JSON.parse(localStorage.getItem("krakenViz") || "{}")); } catch {}
+    if (!VIZ_PACKS[vizSettings.pack]) vizSettings.pack = "default";
+    function vizSaveSettings(){ try { localStorage.setItem("krakenViz", JSON.stringify(vizSettings)); } catch {} }
     const vizCanvas = document.getElementById("vizCanvas");
     viz = {
       on:false, engine:null, ctx:null, presets:null, keys:[], index:-1, name:null,
@@ -1330,15 +1353,80 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
       });
     }
 
+    // One pack's presets: { name: presetObject | "https://…json" }. Cached per pack.
+    const vizPackCache = {};
+    async function vizPackPresets(id){
+      const p = VIZ_PACKS[id];
+      if (p.favorites){
+        // Built fresh each time (the list changes); loads only the packs it needs.
+        const out = {};
+        for (const f of vizFavs){
+          if (f.url){ out[f.name] = f.url; continue; }
+          if (!VIZ_PACKS[f.pack] || VIZ_PACKS[f.pack].favorites) continue;
+          try { const src = await vizPackPresets(f.pack); if (src[f.name]) out[f.name] = src[f.name]; } catch {}
+        }
+        return out;
+      }
+      if (vizPackCache[id]) return vizPackCache[id];
+      let out = {};
+      if (p.packs){
+        for (const sub of p.packs) Object.assign(out, await vizPackPresets(sub));
+      } else if (p.index){
+        const res = await fetch(p.index);
+        if (!res.ok) throw new Error("could not load " + p.index);
+        out = await res.json();
+      } else {
+        if (!window[p.global]) await loadScript(p.script);
+        const P = window[p.global].default || window[p.global];
+        out = P.getPresets();
+      }
+      if (!p.packs) for (const name of Object.keys(out)) if (!vizPresetOrigin[name]) vizPresetOrigin[name] = id;
+      return (vizPackCache[id] = out);
+    }
+
+    function vizIsFav(name){ return !!name && vizFavs.some(f=>f.name === name); }
+    function vizSetFav(name, on){
+      if (!name || vizIsFav(name) === on) return;
+      if (on){
+        const pack = vizPresetOrigin[name] || vizSettings.pack;
+        const src = viz.presets && viz.presets[name];
+        vizFavs.push(typeof src === "string" ? { name, pack, url: src } : { name, pack });
+      } else {
+        vizFavs = vizFavs.filter(f=>f.name !== name);
+      }
+      try { localStorage.setItem("krakenVizFav", JSON.stringify(vizFavs)); } catch {}
+      // Playing the favourites pack: refresh its list (keep the current preset playing).
+      if (vizSettings.pack === "favorites"){ viz.loading = null; vizLoad().then(reportState).catch(()=>{}); }
+    }
+
+    // Load Butterchurn and the chosen pack (again when the pack changes).
     function vizLoad(){
-      if (!viz.loading) viz.loading = (async ()=>{
-        for (const u of BUTTERCHURN_URLS) await loadScript(u);
-        const P = window.butterchurnPresets.default || window.butterchurnPresets;
-        viz.presets = P.getPresets();
-        viz.keys = Object.keys(viz.presets).sort((a, b)=>a.localeCompare(b));
-        bridgeSend({ type:"presets", names: viz.keys });
-      })().catch(e=>{ viz.loading = null; throw e; });   // allow a retry after a failed load
+      const pack = vizSettings.pack;
+      if (!viz.loading || viz.loadingPack !== pack){
+        viz.loadingPack = pack;
+        viz.loading = (async ()=>{
+          if (!window.butterchurn) await loadScript(BUTTERCHURN_URL);
+          const presets = await vizPackPresets(pack);
+          if (vizSettings.pack !== pack) return;          // changed again while loading
+          viz.presets = presets;
+          viz.keys = Object.keys(presets).sort((a, b)=>a.localeCompare(b));
+          viz.index = viz.name ? viz.keys.indexOf(viz.name) : -1;
+          bridgeSend({ type:"presets", names: viz.keys });
+        })().catch(e=>{ viz.loading = null; throw e; });   // allow a retry after a failed load
+      }
       return viz.loading;
+    }
+
+    // Community presets are URLs: fetch (and cache) the JSON before loading it.
+    const vizPresetJson = {};
+    async function vizResolvePreset(name){
+      const p = viz.presets[name];
+      if (typeof p !== "string") return p;
+      if (!vizPresetJson[p]){
+        vizPresetJson[p] = fetch(p).then(r=>{ if (!r.ok) throw new Error("preset download failed"); return r.json(); })
+          .catch(e=>{ delete vizPresetJson[p]; throw e; });
+      }
+      return vizPresetJson[p];
     }
 
     function vizEnsureEngine(){
@@ -1375,8 +1463,23 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
         return;   // keep the current preset
       }
       viz.error = null;
-      viz.name = viz.keys[viz.index];
-      viz.engine.loadPreset(viz.presets[viz.name], blend ?? 2.7);
+      const name = viz.name = viz.keys[viz.index];
+      viz.lastChange = performance.now();
+      const token = viz.presetToken = (viz.presetToken || 0) + 1;
+      const time = blend ?? vizSettings.blend;
+      vizResolvePreset(name).then(preset=>{
+        if (token !== viz.presetToken || !viz.engine) return;   // a newer change won
+        viz.engine.loadPreset(preset, time);
+      }).catch(e=>{ viz.error = String(e && e.message || e); reportState(); });
+    }
+
+    // Auto-change: every vizSettings.cycle seconds, random or in order.
+    function vizCycleDue(now){
+      if (!vizSettings.cycle || !viz.keys.length) return;
+      if (now - (viz.lastChange || now) >= vizSettings.cycle * 1000){
+        vizPreset(vizSettings.order === "sequential" ? { step: 1 } : { random: true });
+        reportState();
+      }
     }
 
     function vizAudio(buf){
@@ -1403,6 +1506,7 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
       const due = now - viz.lastDraw >= 1000 / viz.maxFps - 2;
       if (!blackedOut && due){
         viz.lastDraw = now;
+        vizCycleDue(now);
         if (viz.titleBurn) vizTitleKeepAlive(now);
         try { viz.engine.render({ audioLevels: viz.levels }); }
         catch (e) { viz.error = String(e && e.message || e); }
@@ -1433,7 +1537,7 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
       }
       if (cmd.res) vizSetRes(cmd.res);
       const first = viz.index < 0;
-      vizPreset(cmd.preset ? { name: cmd.preset } : cmd.random ? { random:true } : { keep:true }, first ? 0 : 2.7);
+      vizPreset(cmd.preset ? { name: cmd.preset } : cmd.random ? { random:true } : { keep:true }, first ? 0 : undefined);
       if (!viz.on){
         viz.on = true;
         vizCanvas.classList.add("on");
@@ -1628,7 +1732,7 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
       return true;
     }
 
-    window.krakenDebug = { get viz(){ return viz; }, popTitle, keepAlive: now => vizTitleKeepAlive(now) };   // for poking at it from devtools
+    window.krakenDebug = { get viz(){ return viz; }, popTitle, keepAlive: now => vizTitleKeepAlive(now), cycleDue: now => vizCycleDue(now) };   // for poking at it from devtools
 
     function vizLaunchTitle(spec){
       try {
@@ -1660,7 +1764,13 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
     }
     function onNowPlaying(msg){
       nowPlaying = { title: msg.title || "", artist: msg.artist || "", playing: !!msg.playing };
-      if (msg.changed && nowPlaying.playing) popTitle(false);
+      if (!msg.changed || !nowPlaying.playing) return;
+      // New track: optionally a new preset first, so the title burns into it.
+      if (vizSettings.onTrack && viz && viz.on){
+        vizPreset(vizSettings.order === "sequential" ? { step: 1 } : { random: true });
+        reportState();
+      }
+      popTitle(false);
     }
 
     function clearHold(){
@@ -1685,6 +1795,29 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
           if (m === "off"){ vizStop(); handleRemoteCommand({ action:"slideshow" }); return; }
           if (m === "res"){ vizSetRes(cmd.value); break; }
           if (m === "fps"){ viz.maxFps = clamp(Math.round(Number(cmd.value) || 60), 5, 60); break; }
+          // Settings (saved on this page): pack, auto-change, order, blend, change on track.
+          if (m === "pack"){
+            const id = String(cmd.value || "").toLowerCase();
+            if (VIZ_PACKS[id] && id !== vizSettings.pack){
+              vizSettings.pack = id; vizSaveSettings();
+              vizLoad().then(()=>{
+                if (!viz.keys.length) viz.error = id === "favorites" ? "no favourite presets yet" : "this pack is empty";
+                else if (viz.on) vizPreset({ random:true });
+                reportState();
+              })
+                       .catch(e=>{ viz.error = String(e && e.message || e); reportState(); });
+            }
+            break;
+          }
+          if (m === "cycle"){ vizSettings.cycle = clamp(Math.round(Number(cmd.value) || 0), 0, 3600); viz.lastChange = performance.now(); vizSaveSettings(); break; }
+          if (m === "order"){ vizSettings.order = cmd.value === "sequential" ? "sequential" : "random"; vizSaveSettings(); break; }
+          if (m === "blend"){ vizSettings.blend = clamp(Number(cmd.value) || 0, 0, 10); vizSaveSettings(); break; }
+          if (m === "ontrack"){ vizSettings.onTrack = cmd.value === "on" || cmd.value === true; vizSaveSettings(); break; }
+          if (m === "fav"){
+            const v = String(cmd.value || "toggle");
+            vizSetFav(viz.name, v === "on" ? true : v === "off" ? false : !vizIsFav(viz.name));
+            break;
+          }
           if (!viz.on || m === "on"){ vizStart(cmd); return; }   // async; reports when ready
           if (m === "next") vizPreset({ step: 1 });
           else if (m === "prev") vizPreset({ step: -1 });
