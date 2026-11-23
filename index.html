@@ -1532,7 +1532,13 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
       function open(){
         let ws;
         try { ws = new WebSocket(url); } catch { return retry(); }
-        ws.onopen = ()=>{ bridgeSocket = ws; delay = 2000; reportCaps(); reportPlaylist(); reportState(); };
+        ws.onopen = ()=>{
+          bridgeSocket = ws; delay = 2000; reportCaps(); reportPlaylist(); reportState();
+          // Give the bridge (and HA's preset dropdown) the preset names: resend them,
+          // or fetch them quietly in the background if the visualizer hasn't loaded yet.
+          if (viz.keys.length) bridgeSend({ type:"presets", names: viz.keys });
+          else setTimeout(()=>{ vizLoad().catch(()=>{}); }, 5000);
+        };
         ws.binaryType = "arraybuffer";
         ws.onmessage = (ev)=>{
           if (typeof ev.data !== "string") { vizAudio(ev.data); return; }   // audio frame
