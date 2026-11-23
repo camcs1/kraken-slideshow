@@ -1,8 +1,10 @@
-# Adds (or with -Remove, deletes) a shortcut in your Startup folder that runs
-# the Kraken bridge hidden at logon. Nothing runs as admin.
-param([switch]$Remove)
+# Adds (or with -Remove, deletes) a Startup-folder shortcut that runs the
+# Kraken Bridge tray app at logon. Builds KrakenBridge.exe first if needed.
+# Nothing runs as admin.
+param([switch]$Remove, [switch]$NoStart)
 
-$lnk = Join-Path ([Environment]::GetFolderPath('Startup')) 'Kraken Bridge.lnk'
+$startup = [Environment]::GetFolderPath('Startup')
+$lnk = Join-Path $startup 'Kraken Bridge.lnk'
 
 if ($Remove) {
     if (Test-Path $lnk) { Remove-Item $lnk; "Removed $lnk" } else { "No shortcut at $lnk" }
@@ -13,13 +15,18 @@ if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
     throw 'node is not on PATH. Install Node.js 18+ first.'
 }
 
-$vbs = Join-Path $PSScriptRoot 'start-hidden.vbs'
+$exe = Join-Path $PSScriptRoot 'KrakenBridge.exe'
+if (-not (Test-Path $exe)) { & (Join-Path $PSScriptRoot 'tray\build.ps1') }
+
 $shell = New-Object -ComObject WScript.Shell
 $sc = $shell.CreateShortcut($lnk)
-$sc.TargetPath = "$env:WINDIR\System32\wscript.exe"
-$sc.Arguments = "`"$vbs`""
+$sc.TargetPath = $exe
 $sc.WorkingDirectory = $PSScriptRoot
-$sc.Description = 'Kraken Slideshow bridge (ws://127.0.0.1:27880)'
+$sc.Description = 'Kraken Bridge tray app (Kraken LCD remote control)'
 $sc.Save()
-"Created $lnk"
-"Start it now without logging out: wscript `"$vbs`""
+"Created $lnk -> $exe"
+
+if (-not $NoStart -and -not (Get-Process KrakenBridge -ErrorAction SilentlyContinue)) {
+    Start-Process $exe
+    'Started the tray app (it replaces any bridge already running).'
+}

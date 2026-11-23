@@ -1343,7 +1343,8 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
       const n = viz.keys.length;
       if (sel.name){
         const w = String(sel.name).toLowerCase();
-        const i = viz.keys.findIndex(k=>k.toLowerCase().includes(w));
+        let i = viz.keys.findIndex(k=>k.toLowerCase() === w);       // exact (HA's preset list)
+        if (i === -1) i = viz.keys.findIndex(k=>k.toLowerCase().includes(w));
         if (i === -1) { viz.error = 'no preset matching "' + sel.name + '"'; return; }
         viz.index = i;
       } else if (sel.step) {

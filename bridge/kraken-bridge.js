@@ -161,7 +161,8 @@ function startServer() {
     try {
       if (url.pathname === "/status") {
         return json(res, 200, { clients: clients.size, state: lastState, caps,
-                                audio: { running: !!audioProc, packetsPerSec: audioRate } });
+                                audio: { running: !!audioProc, packetsPerSec: audioRate },
+                                mqtt: ha ? ha.status() : { enabled: false } });
       }
       if (url.pathname === "/presets") {
         if (!presets) return json(res, 503, { error: "visualizer presets not loaded yet (turn the visualizer on once)" });
@@ -187,34 +188,83 @@ function startServer() {
       } else {
         return json(res, 404, { error: "not found" });
       }
-
-      const problem = validate(cmd);
-      if (problem) return json(res, 400, { error: problem });
-      if (!clients.size) return json(res, 503, { error: "Kraken page is not connected" });
-
-      // "hold" = pick whatever the page last reported it was showing.
-      if (cmd.action === "hold") {
-        if (!lastState || !Number.isInteger(lastState.index)) return json(res, 503, { error: "Kraken page has not reported what it is showing yet" });
-        cmd = { action: "pick", index: lastState.index };
-      }
-      if (cmd.action === "pick") {
-        const hit = resolvePick(playlist, cmd);
-        if (hit.error) return json(res, hit.status, { error: hit.error, names: playlist ? playlist.map(p => p.name) : undefined });
-        cmd = { action: "pick", index: hit.item.index, name: hit.item.name };
-      }
-
-      if (cmd.action === "visualizer") {
-        if (cmd.mode === "off") stopAudio();
-        else if (cmd.mode !== "res" && cmd.mode !== "fps") startAudio();
-      }
-
-      broadcast(clients, cmd);
-      log(`-> ${JSON.stringify(cmd)} (${clients.size} client${clients.size === 1 ? "" : "s"})`);
-      json(res, 200, { ok: true, sent: cmd, clients: clients.size });
+      const r = dispatch(cmd);
+      json(res, r.status, r.body);
     } catch (err) {
       json(res, 400, { error: err.message });
     }
   });
+
+  // One path for every command source (HTTP, CLI, MQTT): validate, resolve
+  // names against the page's playlist, manage the audio helper, send.
+  function dispatch(cmd) {
+    const { lastState, playlist } = primary();
+    const problem = validate(cmd);
+    if (problem) return { status: 400, body: { error: problem } };
+    if (!clients.size) return { status: 503, body: { error: "Kraken page is not connected" } };
+
+    // "hold" = pick whatever the page last reported it was showing.
+    if (cmd.action === "hold") {
+      if (!lastState || !Number.isInteger(lastState.index)) return { status: 503, body: { error: "Kraken page has not reported what it is showing yet" } };
+      cmd = { action: "pick", index: lastState.index };
+    }
+    if (cmd.action === "pick") {
+      const hit = resolvePick(playlist, cmd);
+      if (hit.error) return { status: hit.status, body: { error: hit.error, names: playlist ? playlist.map(p => p.name) : undefined } };
+      cmd = { action: "pick", index: hit.item.index, name: hit.item.name };
+    }
+
+    if (cmd.action === "visualizer") {
+      if (cmd.mode === "off") stopAudio();
+      else if (cmd.mode !== "res" && cmd.mode !== "fps") startAudio();
+    }
+
+    broadcast(clients, cmd);
+    log(`-> ${JSON.stringify(cmd)} (${clients.size} client${clients.size === 1 ? "" : "s"})`);
+    return { status: 200, body: { ok: true, sent: cmd, clients: clients.size } };
+  }
+
+  /* --- Home Assistant over MQTT (optional) -----------------------------
+     Enabled when KRAKEN_MQTT_HOST is set (the tray app passes it, with the
+     password, in the environment). */
+  const ha = process.env.KRAKEN_MQTT_HOST
+    ? require("./ha-mqtt")({
+        host: process.env.KRAKEN_MQTT_HOST,
+        port: Number(process.env.KRAKEN_MQTT_PORT || 1883),
+        username: process.env.KRAKEN_MQTT_USER || undefined,
+        password: process.env.KRAKEN_MQTT_PASSWORD || undefined,
+        nodeId: (process.env.KRAKEN_NODE_ID || require("os").hostname()).toLowerCase().replace(/[^a-z0-9_]/g, "_"),
+        log,
+        dispatch: c => {
+          const r = dispatch(c);
+          if (r.status !== 200) log(`mqtt command failed: ${r.body.error}`);
+          return r;
+        },
+        textToCommand: text => cliArgsToCommand(String(text).trim().split(/\s+/)),
+      })
+    : null;
+  delete process.env.KRAKEN_MQTT_PASSWORD;
+
+  // Everything HA shows, derived from the page's latest report.
+  function snapshot() {
+    const { lastState: s, presets } = primary();
+    const v = s && s.visualizer;
+    const vizOn = !!(s && s.mode === "visualizer");
+    return {
+      connected: clients.size > 0,
+      mode: s ? s.mode : "disconnected",
+      position: !s ? null : vizOn ? `${v.preset} · ${v.fps} fps` : `${s.index + 1} / ${s.count}`,
+      name: s ? s.name : null,
+      src: s && !vizOn ? s.src : null,
+      night_mode: !s ? "auto" : s.nightOverride === true ? "on" : s.nightOverride === false ? "off" : "auto",
+      night: !!(s && s.night),
+      preset: v ? v.preset : null,
+      fps: vizOn ? v.fps : 0,
+      presets: presets || [],
+    };
+  }
+  const haUpdate = () => { if (ha) ha.update(snapshot()); };
+  haUpdate();   // so HA has a state ("disconnected") before the page connects
 
   server.on("upgrade", (req, socket) => {
     if (new URL(req.url, "http://x").pathname !== "/ws" || !req.headers["sec-websocket-key"]) {
@@ -251,10 +301,13 @@ function startServer() {
               // Page left visualizer mode (a slideshow command, a reload): stop capturing.
               // The grace period covers state reports already in flight when it started.
               if (msg.state.mode !== "visualizer" && audioProc && Date.now() - audioStartedAt > 5000) stopAudio();
+              // Page is visualizing but nothing captures audio (the bridge restarted): start it.
+              if (msg.state.mode === "visualizer" && !audioProc) startAudio();
+              haUpdate();
             }
             if (msg.type === "playlist" && Array.isArray(msg.items)) info.playlist = msg.items;
             if (msg.type === "caps") info.caps = msg.caps;
-            if (msg.type === "presets" && Array.isArray(msg.names)) info.presets = msg.names;
+            if (msg.type === "presets" && Array.isArray(msg.names)) { info.presets = msg.names; haUpdate(); }
           } catch { /* ignore junk */ }
         }
       }
@@ -262,6 +315,7 @@ function startServer() {
     const drop = () => {
       if (clients.delete(socket)) log(`page disconnected, ${clients.size} left`);
       if (!clients.size) stopAudio();
+      haUpdate();
     };
     socket.on("close", drop);
     socket.on("error", drop);
