@@ -5,9 +5,9 @@ A custom media slideshow for the **NZXT Kraken LCD**, running through NZXT CAM's
 (`mp4`, `webm`) with intervals, scheduling, night mode and cropping tuned for the
 Kraken's round screen.
 
-An optional local **bridge** adds remote control (from Home Assistant, HASS.Agent
-or PowerShell) and a **MilkDrop music visualizer** that reacts to whatever the PC
-is playing.
+An optional local **bridge**, run by a small **tray app**, adds remote control
+(native Home Assistant entities over MQTT, the tray menu, or PowerShell) and a
+**MilkDrop music visualizer** that reacts to whatever the PC is playing.
 
 ---
 
@@ -51,8 +51,9 @@ is playing.
 GitHub Pages index.html ─┤  Configure browser (editor)         │
                          └──────────────┬──────────────────────┘
                                         │ ws://127.0.0.1:27880 (optional)
-Home Assistant ─MQTT─▶ HASS.Agent ─▶ bridge (node) ◀─UDP─ audio helper (python)
-                     PowerShell ──HTTP──┘
+Home Assistant ◀──MQTT──▶ bridge (node) ◀─UDP─ audio helper (python, visualizer only)
+                     PowerShell ─HTTP─┘ ▲
+                    tray app (KrakenBridge.exe) runs and supervises it
 ```
 
 - CAM opens **two browser instances** per integration: the **Kraken browser**
@@ -61,8 +62,9 @@ Home Assistant ─MQTT─▶ HASS.Agent ─▶ bridge (node) ◀─UDP─ audio 
   straight away.
 - For remote control, the Kraken page connects out to a small bridge on the same
   PC. CAM's browser allows an https page to reach `localhost`, so the page can
-  stay on GitHub Pages. The bridge listens on `127.0.0.1` only. Without it the
-  slideshow plays exactly as normal.
+  stay on GitHub Pages. The bridge listens on `127.0.0.1` only and reaches Home
+  Assistant through your MQTT broker. Without it the slideshow plays exactly as
+  normal.
 
 ---
 
@@ -76,21 +78,23 @@ Home Assistant ─MQTT─▶ HASS.Agent ─▶ bridge (node) ◀─UDP─ audio 
    https://YOURUSER.github.io/kraken-slideshow/index.html
    ```
 
-### Bridge (remote control and visualizer)
+### Bridge and tray app (remote control and visualizer)
 Requires **Node.js 18+**. The visualizer also needs **Python 3** with
-`pip install --user soundcard`.
+`pip install --user soundcard`. Home Assistant control needs an MQTT broker (such
+as the Mosquitto app) and a login for the bridge.
 
-```powershell
-node bridge\kraken-bridge.js
-```
-
-To start it hidden at every logon:
+This builds the tray app with the C# compiler built into Windows, makes it start
+at logon, and starts it:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File bridge\install-startup.ps1
 ```
 
-Check that the Kraken page has connected (`clients` should be 1):
+On first run it asks for the MQTT broker and login; the password is stored
+encrypted for your Windows account. The tray icon turns green once the Kraken
+page and Home Assistant are both connected.
+
+Check from the command line (`clients` should be 1):
 
 ```powershell
 node bridge\kraken-bridge.js status
@@ -111,7 +115,7 @@ Full command reference and setup details: [bridge/README.md](bridge/README.md).
 
 ### Remote commands
 Any of these works with `node bridge\kraken-bridge.js send …`, as an HTTP call
-to `http://127.0.0.1:27880/…`, or through HASS.Agent:
+to `http://127.0.0.1:27880/…`, or published over MQTT to `kraken/<pc name>/command`:
 
 | Command | Effect |
 |---|---|
@@ -127,14 +131,12 @@ to `http://127.0.0.1:27880/…`, or through HASS.Agent:
 | `reload` | Reload the Kraken page (picks up a new `index.html`) |
 
 ### Home Assistant
-With [HASS.Agent](https://github.com/hass-agent/HASS.Agent) on the PC, one
-**Custom** command pointing at `bridge\kraken.cmd` takes any of the commands
-above as its MQTT action payload. A Home Assistant script that publishes to that
-command's action topic can then back dashboard buttons, automations and a
-pick-by-number text box. PowerShell sensors using `bridge\kraken-sensor.ps1`
-report the mode, position (or visualizer preset and fps) and the URL on screen.
-See [bridge/README.md](bridge/README.md#hassagent-setup) for the exact setup and
-a gotcha with how HASS.Agent quotes commands.
+Once the tray app has an MQTT login, a **Kraken LCD** device appears in Home
+Assistant by itself (MQTT discovery): buttons for next/previous/hold/slideshow,
+a visualizer switch, preset and night-mode dropdowns, a pick-by-number box,
+mode/position/showing sensors and a **Now showing** image. State is pushed the
+moment it changes, and nothing is launched on the PC per command, so no console
+windows flash. Entity list and details: [bridge/README.md](bridge/README.md#home-assistant).
 
 ### Visualizer performance
 CAM's browser renders WebGL in software (on the CPU), so the visualizer's cost

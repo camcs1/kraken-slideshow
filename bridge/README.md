@@ -1,18 +1,22 @@
 # Kraken bridge: remote control for the slideshow
 
-Lets anything on this PC (HASS.Agent, PowerShell, scripts) control the slideshow
-running on the Kraken LCD: next/previous, pause, push an image or video, force
-night mode.
+Controls the slideshow running on the Kraken LCD from Home Assistant, the tray
+icon, PowerShell or scripts: next/previous, pick and hold an item, push any
+image or video, night mode, and a MilkDrop visualizer that follows the PC's audio.
 
 ```
-Home Assistant ──MQTT──▶ HASS.Agent ──HTTP──▶ kraken-bridge.js ──ws://127.0.0.1──▶ Kraken page (?kraken=1)
+Home Assistant ◀──MQTT──▶ kraken-bridge.js ──ws://127.0.0.1──▶ Kraken page (?kraken=1, inside CAM)
+                             ▲        ▲
+       KrakenBridge.exe ─────┘        └── UDP audio ◀── kraken-audio.py (only while visualizing)
+       (tray app: runs it hidden,
+        restarts it, holds MQTT login)
 ```
 
 The page (served over https from GitHub Pages) opens the WebSocket itself. CAM's
 browser allows an https page to reach `localhost`, which is the same route the
-nzxt-esc NowPlaying companion uses. The bridge binds to `127.0.0.1` only, so
-nothing off this PC can reach it: no token and no firewall rule needed.
-HASS.Agent handles the network and authentication side.
+nzxt-esc NowPlaying companion uses. The bridge's HTTP/WebSocket port binds to
+`127.0.0.1` only. Home Assistant reaches it through your MQTT broker, so nothing
+on this PC listens on the network and no process is started per command.
 
 If the bridge isn't running, the slideshow plays as normal. The page retries
 quietly, backing off to every 30 seconds.
@@ -20,21 +24,39 @@ quietly, backing off to every 30 seconds.
 ## Requirements
 
 - Node.js 18 or newer on PATH (no `npm install`; the bridge has no dependencies)
+- For the visualizer: Python 3 with `pip install --user soundcard`
+- For Home Assistant: an MQTT broker HA uses (e.g. the Mosquitto app) and a login for the bridge
 - The updated `index.html` published to GitHub Pages
 
-## Run it
+## Tray app
 
-```powershell
-node C:\Scripts\kraken-slideshow\bridge\kraken-bridge.js
-```
+`KrakenBridge.exe` runs the bridge with no console window, restarts it if it
+exits, and shows a round status icon: green when the Kraken page and Home
+Assistant are both connected, amber if one isn't, grey if the bridge is down.
+Its menu has the current status, quick commands (Next, Hold this, Slideshow,
+Visualizer on/off, Next preset), **Home Assistant (MQTT) settings…**, **Open
+log**, **Restart bridge** and **Quit**.
 
-To start it hidden at every logon:
+Build it (uses the C# compiler that ships with Windows, nothing to install) and
+make it start at logon:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File C:\Scripts\kraken-slideshow\bridge\install-startup.ps1
 ```
 
-(`-Remove` takes the shortcut out again.)
+That builds `KrakenBridge.exe` if needed, adds a Startup-folder shortcut, and
+starts it; it replaces any bridge already running. `-Remove` takes the shortcut
+out. To rebuild after editing [tray/KrakenTray.cs](tray/KrakenTray.cs), run
+[tray/build.ps1](tray/build.ps1).
+
+On first run it asks for the MQTT broker, port, username and password (the
+broker and username are prefilled from HASS.Agent if it's installed). Settings
+live in `%APPDATA%\KrakenBridge\settings.ini`, with the password encrypted for
+your Windows account (DPAPI). The log is `%LOCALAPPDATA%\KrakenBridge\bridge.log`.
+
+Without the tray app you can still run `node kraken-bridge.js` directly; set
+`KRAKEN_MQTT_HOST`, `KRAKEN_MQTT_PORT`, `KRAKEN_MQTT_USER` and
+`KRAKEN_MQTT_PASSWORD` to enable Home Assistant.
 
 Check that the Kraken page is connected:
 
@@ -42,8 +64,8 @@ Check that the Kraken page is connected:
 node C:\Scripts\kraken-slideshow\bridge\kraken-bridge.js status
 ```
 
-`clients` should be 1 or more, and `state.src` shows what's on the screen. If
-it stays 0, restart CAM, or wait 30s after starting the bridge.
+`clients` should be 1 or more, `state` shows what's on the screen and `mqtt`
+shows the Home Assistant connection. If `clients` stays 0, restart CAM.
 
 ## Commands
 
@@ -58,7 +80,7 @@ it stays 0, restart CAM, or wait 30s after starting the bridge.
 | `show <url> [seconds]` | `/show?url=…&seconds=30` | Push any image or video. With seconds, the slideshow comes back afterwards; without, it holds until `next`/`resume` |
 | `night on\|off\|auto` | `/night?mode=on` | Force night mode (uses your black/dim setting), or go back to the schedule |
 | `reload` | `/reload` | Reload the Kraken page (picks up a newly published `index.html`) |
-| `status` | `/status` | Connected clients plus the last state the page reported (`mode` is `slideshow`, `picked`, `paused` or `remote`) |
+| `status` | `/status` | Connected clients, the last state the page reported, audio and MQTT status |
 | `playlist` / `playlist names` | `/playlist`, `/playlist?format=names` | The playlist as JSON, or one name per line |
 
 **Item names** are the item's `name` option if it has one, otherwise the file
@@ -83,12 +105,12 @@ whatever the PC is playing. Any slideshow command (`slideshow`, `next`,
 
 | Command | Effect |
 |---|---|
-| `visualizer on [preset words]` | Start, optionally on the first preset whose name contains the words |
+| `visualizer on [preset words]` | Start, optionally on a preset: exact name first, else the first containing the words |
 | `visualizer next` / `prev` / `random` | Change preset (2.7 s blend) |
 | `visualizer res 256` | Internal render size, 128–1024 (default 192; scaled up to the LCD) |
 | `visualizer fps 20` | Frame cap, 5–60 (default none) |
 | `visualizer off` | Back to the slideshow |
-| `presets` (CLI) / `/presets` | Preset names (after the first `visualizer on`) |
+| `presets` (CLI) / `/presets` | Preset names (loaded in the background once the page connects) |
 
 **How the audio gets there.** On `visualizer on` the bridge starts
 [kraken-audio.py](kraken-audio.py), which records the default output device
@@ -114,60 +136,50 @@ ticks animation frames at about 40 Hz, so a frame cap only skips whole frames
 
 Night mode set to *black* pauses rendering entirely.
 
-## HASS.Agent setup
+## Home Assistant
 
-This is the setup running on GAMINGPC. HASS.Agent **actions** append an MQTT
-payload to a command's arguments, so one command handles every bridge action.
+With MQTT configured, the bridge announces a **Kraken LCD** device through MQTT
+discovery. Nothing needs setting up in HA.
 
-**Command.** Add a **Custom** command named `GAMINGPC_Kraken`, entity type
-**button**, with the command:
+| Entity | What it does |
+|---|---|
+| `button.kraken_lcd_next` / `_prev` / `_hold` / `_slideshow` / `_reload` | The matching command |
+| `button.kraken_lcd_viz_next` / `_viz_random` | Change visualizer preset |
+| `switch.kraken_lcd_visualizer` | Visualizer on/off |
+| `select.kraken_lcd_preset` | Start the visualizer on a chosen preset (all names listed) |
+| `select.kraken_lcd_night` | Night mode: `auto` (schedule), `on`, `off` |
+| `text.kraken_lcd_pick` | Hold an item by number (1-based, as the Position sensor shows) or name |
+| `sensor.kraken_lcd_mode` | `slideshow`, `picked`, `paused`, `remote`, `visualizer`, `disconnected` |
+| `sensor.kraken_lcd_position` | `20 / 56`, or the preset and fps in visualizer mode |
+| `sensor.kraken_lcd_showing` | Item or preset name |
+| `sensor.kraken_lcd_fps` | Visualizer frame rate (diagnostic) |
+| `binary_sensor.kraken_lcd_page` | Whether the Kraken page is connected (diagnostic) |
+| `image.kraken_lcd_now` | The image on the screen |
 
-```
-C:\Scripts\kraken-slideshow\bridge\kraken.cmd
-```
+State is pushed when it changes, not polled. The device shows unavailable when
+the bridge is offline (MQTT last will).
 
-It has to be the `.cmd` wrapper, a single path with no arguments. HASS.Agent
-wraps the whole configured command in quotes before appending the payload, so
-`node "...\kraken-bridge.js" send` becomes `"node "..." send" next`, which
-Windows can't run. Its action topic is
-`homeassistant/button/GAMINGPC/GAMINGPC_Kraken/action` (the **show mqtt action
-topic** button shows it).
+**Any command over MQTT.** Publish the command text to
+`kraken/<pc name>/command`, e.g. `next`, `pick 5`, `show https://… 20`,
+`visualizer on wormhole`. On GAMINGPC, `script.kraken_command` (field
+`command`) does this, and the dashboard's **PC** view has a **Kraken LCD**
+section built from the entities above.
 
-**Sensors.** Three **PowerShell** sensors, every 10 seconds, using
-[kraken-sensor.ps1](kraken-sensor.ps1):
+**Pushing a specific image** (doorbell snapshot, alert graphic): call
+`script.kraken_command` with `command: show <url> 20`. The URL must be loadable
+by CAM's browser. Watch out for an `http://` Home Assistant URL, which an https
+page may refuse to load as mixed content; an https URL is safest.
 
-| Sensor | Query | Example state |
-|---|---|---|
-| `GAMINGPC_kraken_mode` | `& 'C:\Scripts\kraken-slideshow\bridge\kraken-sensor.ps1' -Field mode` | `slideshow`, `picked`, `paused`, `remote`, `offline` |
-| `GAMINGPC_kraken_position` | `... -Field position` | `20 / 56` |
-| `GAMINGPC_kraken_src` | `... -Field src` | URL of what's on the screen |
-
-A playlist-names sensor doesn't work for long playlists: HA caps a state at 255
-characters, and 56 Reddit-style IDs is about 800.
-
-**Home Assistant** (created through HA-MCP):
-
-- `script.kraken_command`: field `command`, publishes it to the action topic
-  (mode `queued`). Every control calls this, e.g. `command: next`.
-- `input_text.kraken_pick` plus `automation.kraken_pick_from_text_box`: type a
-  number (1-based, as the position sensor shows) or an item name, and that item
-  is held. The box clears itself afterwards.
-- Overview dashboard, **PC** view, **Kraken LCD** section: now-showing preview,
-  Previous / Hold this / Next / Slideshow / Night on / Night auto / Reload /
-  Visualizer / Next preset / Random preset buttons, and the pick box. In
-  visualizer mode the position sensor shows the preset name and fps.
-
-**Pushing a specific image** (doorbell snapshot, alert graphic): make a fixed
-command per image, e.g.
-`Invoke-RestMethod "http://127.0.0.1:27880/show?url=https://example.com/doorbell.jpg&seconds=20"`.
-Or call `script.kraken_command` with `command: show <url> 20`. The URL
-must be loadable by CAM's browser. Watch out for an `http://` Home Assistant
-URL, which an https page may refuse to load as mixed content. An https URL is
-safest.
+**Previously** this ran through HASS.Agent (a Custom command per action and
+PowerShell sensors). Each command and each sensor poll started a console process,
+which flashed a window, so it was replaced by the bridge's own MQTT connection.
 
 ## Settings
 
 - Port and host: environment variables `KRAKEN_BRIDGE_PORT` (default 27880) and
-  `KRAKEN_BRIDGE_HOST` (default 127.0.0.1).
+  `KRAKEN_BRIDGE_HOST` (default 127.0.0.1); `KRAKEN_AUDIO_PORT` (UDP, default 27881).
+- MQTT: `KRAKEN_MQTT_HOST`, `KRAKEN_MQTT_PORT`, `KRAKEN_MQTT_USER`,
+  `KRAKEN_MQTT_PASSWORD` (the tray app sets these), `KRAKEN_NODE_ID` (default:
+  the PC name; used in topics and entity IDs).
 - The page side reads localStorage key `krakenBridgeUrl` (default
   `ws://127.0.0.1:27880/ws`). Set it to `off` to stop the page from connecting.
