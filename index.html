@@ -1403,6 +1403,7 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
       const due = now - viz.lastDraw >= 1000 / viz.maxFps - 2;
       if (!blackedOut && due){
         viz.lastDraw = now;
+        if (viz.titleBurn) vizTitleKeepAlive(now);
         try { viz.engine.render({ audioLevels: viz.levels }); }
         catch (e) { viz.error = String(e && e.message || e); }
         viz.frames++;
@@ -1530,7 +1531,7 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
         t2 = Math.pow(Math.max(0, 1 - p * 1.5), 1.8) * 1.3;
       } else {
         // Burned in: hand over quickly. Slideshow: hold, then fade.
-        const after = t - TT_FLY, hold = a.burn ? 0 : 2.6, fade = a.burn ? 0.35 : 1.1;
+        const after = t - TT_FLY, hold = a.burn ? 0.4 : 2.6, fade = a.burn ? 1.6 : 1.1;
         if (after > hold + fade){ ttEnd(); return; }
         if (after > hold) alpha = 1 - (after - hold) / fade;
       }
@@ -1569,7 +1570,15 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
       if (!tt || typeof tt.renderTitle !== "function") return false;
       if (tt.__kraken) return true;
       const draw = tt.renderTitle.bind(tt);
-      tt.renderTitle = (progress, flip, g) => { if (progress >= 1 && flip) draw(progress, flip, g); };
+      const gl0 = tt.gl, uniform1f = gl0.uniform1f;
+      tt.renderTitle = (progress, flip, g) => {
+        if (!(progress >= 1 && flip)) return;          // burn-in pass only
+        // Re-stamps during the hold are drawn fainter (scale the shader's textColor).
+        const b = viz.titleBurn, alpha = b ? b.alpha : 1;
+        if (alpha >= 1) { draw(progress, flip, g); return; }
+        gl0.uniform1f = function(loc, v){ return uniform1f.call(this, loc, loc === tt.textColorLoc ? v * alpha : v); };
+        try { draw(progress, flip, g); } finally { gl0.uniform1f = uniform1f; }
+      };
       const S = 512, cv = document.createElement("canvas"); cv.width = cv.height = S;
       const g2 = cv.getContext("2d");
       tt.generateTitleTexture = () => {
@@ -1619,15 +1628,35 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
       return true;
     }
 
-    window.krakenDebug = { get viz(){ return viz; }, popTitle };   // for poking at it from devtools
+    window.krakenDebug = { get viz(){ return viz; }, popTitle, keepAlive: now => vizTitleKeepAlive(now) };   // for poking at it from devtools
 
     function vizLaunchTitle(spec){
       try {
         if (!vizPatchTitle()) return false;
         viz.titleSpec = spec;
-        viz.engine.launchSongTitleAnim(spec.title);
+        // Don't use Butterchurn's own timer (its clock follows an fps estimate and
+        // can lag); draw the texture now and trigger the burn when the DOM text lands.
+        viz.engine.renderer.titleText.generateTitleTexture(spec.title);
+        viz.titleBurn = { landAt: performance.now() + TT_FLY * 1000, alpha: 1 };
         return true;
       } catch (e) { return false; }
+    }
+
+    /* MilkDrop burns the title in once and the preset's decay eats it within a
+       few frames. Keep stamping it for TT_BURN_HOLD seconds at a falling strength
+       so it lingers as a smear the preset keeps warping (to the music). Setting
+       supertext's start to one duration ago makes this frame's progress >= 1,
+       which is when Butterchurn runs the burn-in pass. */
+    const TT_BURN_HOLD = 2.6;
+    function vizTitleKeepAlive(now){
+      const b = viz.titleBurn, r = viz.engine && viz.engine.renderer;
+      if (!b || !r || now < b.landAt) return;           // still flying in (the DOM text)
+      const u = (now - b.landAt) / (TT_BURN_HOLD * 1000);
+      if (u >= 1) { viz.titleBurn = null; return; }
+      // First stamp at full strength (MilkDrop's burn-in), then fading re-stamps.
+      b.alpha = b.stamped ? 0.6 * Math.pow(1 - u, 1.5) : 1;
+      b.stamped = true;
+      r.supertext = { startTime: r.time - 1.7, duration: 1.7 };
     }
     function onNowPlaying(msg){
       nowPlaying = { title: msg.title || "", artist: msg.artist || "", playing: !!msg.playing };
