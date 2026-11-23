@@ -1473,6 +1473,7 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
         case "pick": {
           // Show one playlist item and hold it until "slideshow".
           if (!items[cmd.index]) break;
+          if (viz) vizStop();   // picking a picture means "show it", so leave the visualizer
           if (!picked && !paused) returnPos = orderPos;
           clearHold();
           picked = true; paused = true;

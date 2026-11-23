@@ -134,7 +134,9 @@ to `http://127.0.0.1:27880/…`, or published over MQTT to `kraken/<pc name>/com
 Once the tray app has an MQTT login, a **Kraken LCD** device appears in Home
 Assistant by itself (MQTT discovery): buttons for next/previous/hold/slideshow,
 a visualizer switch, preset and night-mode dropdowns, a pick-by-number box,
-mode/position/showing sensors and a **Now showing** image. State is pushed the
+mode/position/showing sensors and a **Now showing** image. A custom
+**picker card** (`ha/kraken-picker-card.js`) shows the playlist as thumbnails
+you tap to put on the screen. State is pushed the
 moment it changes, and nothing is launched on the PC per command, so no console
 windows flash. Entity list and details: [bridge/README.md](bridge/README.md#home-assistant).
 

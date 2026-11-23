@@ -247,7 +247,7 @@ function startServer() {
 
   // Everything HA shows, derived from the page's latest report.
   function snapshot() {
-    const { lastState: s, presets } = primary();
+    const { lastState: s, presets, playlist } = primary();
     const v = s && s.visualizer;
     const vizOn = !!(s && s.mode === "visualizer");
     return {
@@ -255,12 +255,14 @@ function startServer() {
       mode: s ? s.mode : "disconnected",
       position: !s ? null : vizOn ? `${v.preset} · ${v.fps} fps` : `${s.index + 1} / ${s.count}`,
       name: s ? s.name : null,
+      index: s ? s.index : null,
       src: s && !vizOn ? s.src : null,
       night_mode: !s ? "auto" : s.nightOverride === true ? "on" : s.nightOverride === false ? "off" : "auto",
       night: !!(s && s.night),
       preset: v ? v.preset : null,
       fps: vizOn ? v.fps : 0,
       presets: presets || [],
+      playlist: (playlist || []).map(p => ({ name: p.name, src: p.src, type: p.type })),
     };
   }
   const haUpdate = () => { if (ha) ha.update(snapshot()); };
@@ -305,7 +307,7 @@ function startServer() {
               if (msg.state.mode === "visualizer" && !audioProc) startAudio();
               haUpdate();
             }
-            if (msg.type === "playlist" && Array.isArray(msg.items)) info.playlist = msg.items;
+            if (msg.type === "playlist" && Array.isArray(msg.items)) { info.playlist = msg.items; haUpdate(); }
             if (msg.type === "caps") info.caps = msg.caps;
             if (msg.type === "presets" && Array.isArray(msg.names)) { info.presets = msg.names; haUpdate(); }
           } catch { /* ignore junk */ }

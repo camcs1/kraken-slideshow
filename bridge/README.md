@@ -155,9 +155,30 @@ discovery. Nothing needs setting up in HA.
 | `sensor.kraken_lcd_fps` | Visualizer frame rate (diagnostic) |
 | `binary_sensor.kraken_lcd_page` | Whether the Kraken page is connected (diagnostic) |
 | `image.kraken_lcd_now` | The image on the screen |
+| `sensor.kraken_lcd_playlist` | Number of items; the `items` attribute lists each name, URL and type (feeds the picker card) |
 
 State is pushed when it changes, not polled. The device shows unavailable when
 the bridge is offline (MQTT last will).
+
+### Picture picker card
+
+`ha/kraken-picker-card.js` is a small dashboard card that shows the playlist as
+round thumbnails. Tap one to hold it on the Kraken (this also leaves the
+visualizer); the item on screen is outlined, and **Back to slideshow** appears
+while one is held. GIFs stay still until hovered, except the one on screen, so
+a phone isn't playing fifty animations at once.
+
+Add it once under **Settings → Dashboards → ⋮ → Resources** as a JavaScript
+module, straight from GitHub Pages:
+
+```
+https://camcs1.github.io/kraken-slideshow/ha/kraken-picker-card.js?v=1
+```
+
+then add a card with `type: custom:kraken-picker-card`. Options (all optional):
+`title`, `columns` (4), `max_height` (`420px`, or `none`), `animate`
+(`current` / `all` / `none`), and the entity IDs if yours differ. After
+changing the card file, bump `?v=` on the resource so browsers fetch it again.
 
 **Any command over MQTT.** Publish the command text to
 `kraken/<pc name>/command`, e.g. `next`, `pick 5`, `show https://… 20`,

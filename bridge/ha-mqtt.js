@@ -30,7 +30,7 @@ module.exports = function startHaMqtt(opts) {
 
   let sock = null, connected = false, lastError = null;
   let pingTimer = null, retryDelay = 2000, packetId = 1;
-  let snap = null, lastStateJson = null, lastImage = null, lastPresetsKey = null;
+  let snap = null, lastStateJson = null, lastImage = null, lastPresetsKey = null, lastPlaylistJson = null;
 
   /* ------------------------------------------------------ HA entities */
   const device = {
@@ -89,7 +89,19 @@ module.exports = function startHaMqtt(opts) {
 
     const sensor = (key, name, icon, field, extra) => out.push(["sensor", key, common("sensor", key, name,
       Object.assign({ icon, state_topic: `${base}/state`, value_template: stateTpl(field) }, extra))]);
-    sensor("mode", "Mode", "mdi:monitor-screenshot", "mode");
+    sensor("mode", "Mode", "mdi:monitor-screenshot", "mode", {
+      // The picker card highlights the item on screen from this.
+      json_attributes_topic: `${base}/state`,
+      json_attributes_template: "{{ {'index': value_json.index, 'name': value_json.name} | tojson }}",
+    });
+    // Playlist for the picture picker card: state = item count, items as an attribute.
+    out.push(["sensor", "playlist", common("sensor", "playlist", "Playlist", {
+      icon: "mdi:image-multiple",
+      state_topic: `${base}/playlist`,
+      value_template: "{{ value_json['items'] | count }}",
+      json_attributes_topic: `${base}/playlist`,
+      unit_of_measurement: "items",
+    })]);
     sensor("position", "Position", "mdi:counter", "position");
     sensor("showing", "Showing", "mdi:image", "name");
     sensor("fps", "Visualizer fps", "mdi:speedometer", "fps",
@@ -113,10 +125,16 @@ module.exports = function startHaMqtt(opts) {
 
   function publishState(force) {
     if (!connected || !snap) return;
-    const { presets, ...rest } = snap;
+    const { presets, playlist, ...rest } = snap;
     rest.preset_option = presets.includes(snap.preset) ? snap.preset : NO_PRESET;
     const json = JSON.stringify(rest);
     if (force || json !== lastStateJson) { publish(`${base}/state`, json, true); lastStateJson = json; }
+    // Playlist goes on its own retained topic, only when it changes (and never empty
+    // just because the page is briefly disconnected).
+    if (playlist.length) {
+      const pl = JSON.stringify({ items: playlist });
+      if (force || pl !== lastPlaylistJson) { publish(`${base}/playlist`, pl, true); lastPlaylistJson = pl; }
+    }
     // Keep the last picture while the visualizer runs (an empty URL is invalid for HA).
     const img = snap.src;
     if (img && (force || img !== lastImage)) { publish(`${base}/image_url`, img, true); lastImage = img; }
