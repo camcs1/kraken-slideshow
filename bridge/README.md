@@ -99,7 +99,7 @@ is running but CAM's page hasn't connected.
 ## MilkDrop visualizer
 
 `visualizer on` replaces the slideshow with a MilkDrop visualizer
-([Butterchurn](https://github.com/jberg/butterchurn), 100 presets) reacting to
+([Butterchurn](https://github.com/jberg/butterchurn), with several preset packs) reacting to
 whatever the PC is playing. Any slideshow command (`slideshow`, `next`,
 `pick`…) or `visualizer off` goes back.
 

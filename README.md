@@ -37,7 +37,7 @@ An optional local **bridge**, run by a small **tray app**, adds remote control
 
 ### MilkDrop visualizer (optional, via the bridge)
 - MilkDrop presets rendered with [Butterchurn](https://github.com/jberg/butterchurn)
-  (100 presets), driven by the PC's system audio.
+  (several preset packs, hundreds of presets), driven by the PC's system audio.
 - Next / previous / random preset, or start on a preset by name.
 - Preset packs (including the community's weekly picks), automatic changes on
   a timer or on each new track, blend time, and a favourites playlist.
