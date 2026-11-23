@@ -259,6 +259,7 @@ type: custom:kraken-visualizer-card
 title: Visualizer
 max_height: 320px          # preset list height before it scrolls; "none" draws every row
 settings_collapsed: true   # settings start folded (until the header is tapped)
+hide_browser_when_off: true  # hide the preset list and Next/Random/Title while the visualizer is off
 cycle_presets: [0, 15, 30, 60, 120]   # auto-change shortcut buttons, seconds
 # entity IDs, if yours differ (defaults shown):
 visualizer_entity: switch.kraken_lcd_visualizer

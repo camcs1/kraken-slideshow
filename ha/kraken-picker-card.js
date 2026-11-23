@@ -20,7 +20,7 @@
  *   mode_entity: sensor.kraken_lcd_mode
  *   slideshow_entity: button.kraken_lcd_slideshow
  */
-const KPC_VERSION = "1.4.0";
+const KPC_VERSION = "1.5.0";
 
 const KPC_DEFAULTS = {
   title: "Pick a picture",
@@ -324,6 +324,7 @@ const KVC_DEFAULTS = {
   title: "Visualizer",
   max_height: "320px",
   settings_collapsed: true,
+  hide_browser_when_off: true,
   cycle_presets: [0, 15, 30, 60, 120],
   visualizer_entity: "switch.kraken_lcd_visualizer",
   preset_entity: "select.kraken_lcd_preset",
@@ -444,6 +445,8 @@ const KVC_STYLE = `
   .tgl::after { content: ""; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: transform .15s; }
   .tgl[aria-checked="true"] { background: var(--primary-color); }
   .tgl[aria-checked="true"]::after { transform: translateX(18px); }
+  ha-card.vizoff .actions, ha-card.vizoff .browser { display: none; }
+  ha-card.vizoff .top { padding-bottom: 14px; }
   @container (max-width: 440px) { .srow { grid-template-columns: 1fr; gap: 6px; } .tools { gap: 6px; } }
 `;
 
@@ -579,6 +582,16 @@ class KrakenVisualizerCard extends HTMLElement {
     const vis = S[c.visualizer_entity], ps = S[c.preset_entity], mode = S[c.mode_entity], fav = S[c.fav_entity];
     const vizOn = !!vis && vis.state === "on";
     const connected = !!mode && !["unavailable", "unknown", "disconnected"].includes(mode.state);
+
+    // Only show the preset browser and Next/Random/Title while the visualizer runs.
+    const hideBrowser = !!c.hide_browser_when_off && !vizOn;
+    if (hideBrowser !== this._browserHidden) {
+      const reveal = this._browserHidden === true;
+      this._browserHidden = hideBrowser;
+      this.shadowRoot.querySelector("ha-card").classList.toggle("vizoff", hideBrowser);
+      // The virtual list measured 0 px while hidden: redraw once it has a height again.
+      if (reveal) requestAnimationFrame(() => { this._renderRows(true); this._scrollToCurrent(false); });
+    }
 
     // Header
     e.power.disabled = kvcBad(vis);
