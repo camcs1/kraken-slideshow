@@ -340,6 +340,7 @@ function startServer() {
       viz_ontrack: !!(v && v.onTrack),
       viz_fav: !!(v && v.favorite),
       viz_favorites: v && typeof v.favorites === "number" ? v.favorites : 0,
+      viz_favorite_names: v && Array.isArray(v.favoriteNames) ? v.favoriteNames.filter(n => typeof n === "string") : [],
       track: nowPlaying.title ? (nowPlaying.artist ? `${nowPlaying.artist} – ${nowPlaying.title}` : nowPlaying.title) : "",
       track_playing: nowPlaying.playing,
       playlist: (playlist || []).map(p => ({ name: p.name, src: p.src, type: p.type })),

@@ -191,7 +191,7 @@ discovery. Nothing needs setting up in HA.
 | `select.kraken_lcd_viz_order` | `random` or `sequential` |
 | `number.kraken_lcd_viz_blend` | Blend time between presets |
 | `switch.kraken_lcd_viz_ontrack` | New preset on track change |
-| `switch.kraken_lcd_viz_fav` | The preset on screen is a favourite (toggle to add/remove) |
+| `switch.kraken_lcd_viz_fav` | The preset on screen is a favourite (toggle to add/remove); attributes `favourites` (count) and `names` (every favourite's name) |
 | `text.kraken_lcd_pick` | Hold an item by number (1-based, as the Position sensor shows) or name |
 | `sensor.kraken_lcd_mode` | `slideshow`, `picked`, `paused`, `remote`, `visualizer`, `disconnected` |
 | `sensor.kraken_lcd_position` | `20 / 56`, or the preset and fps in visualizer mode |
@@ -217,7 +217,7 @@ Add it once under **Settings → Dashboards → ⋮ → Resources** as a JavaScr
 module, straight from GitHub Pages:
 
 ```
-https://camcs1.github.io/kraken-slideshow/ha/kraken-picker-card.js?v=4
+https://camcs1.github.io/kraken-slideshow/ha/kraken-picker-card.js?v=5
 ```
 
 then add a card with `type: custom:kraken-picker-card`. Options (all optional):
@@ -230,6 +230,55 @@ drawn round like the pump screen, using the same fit, background, zoom, rotation
 and offset the Kraken page applies to that item (options `entity`, default
 `image.kraken_lcd_now`, `view_entity`, default `sensor.kraken_lcd_mode`, and `ring`). It fills whatever grid space it's given,
 e.g. `grid_options: {columns: 6, rows: 2}`.
+
+It also defines `custom:kraken-visualizer-card`, a remote for the MilkDrop
+visualizer:
+
+- **Header:** on/off button, the preset on screen, a star to add or remove it
+  from favourites, **Next** / **Random** / **Title** (pop the track title), and
+  what's playing.
+- **Preset browser:** the pack chooser, a search box (every word must match, in
+  any order) and the current pack's presets, taken from
+  `select.kraken_lcd_preset`'s options. Tap one to load it. The preset on screen
+  is highlighted and favourites carry a star; the star button next to the search
+  box shows favourites only, and the crosshair scrolls back to the preset on
+  screen. Only the visible rows are drawn, so the 552-preset Community weekly
+  pack scrolls as smoothly as a short one.
+- **Settings** (folds away; remembered per browser): auto-change with Off / 15 s
+  / 30 s / 1 min / 2 min shortcuts and an exact-seconds box, order, blend time,
+  new preset per track, and when track titles show.
+
+Every control greys out while its entity is unavailable. Stars in the list need
+the bridge and Kraken page from this version or later (they publish the
+favourites' names as the `names` attribute of `switch.kraken_lcd_viz_fav`);
+with an older bridge the card still works, just without stars in the list.
+
+```yaml
+type: custom:kraken-visualizer-card
+# all optional:
+title: Visualizer
+max_height: 320px          # preset list height before it scrolls; "none" draws every row
+settings_collapsed: true   # settings start folded (until the header is tapped)
+cycle_presets: [0, 15, 30, 60, 120]   # auto-change shortcut buttons, seconds
+# entity IDs, if yours differ (defaults shown):
+visualizer_entity: switch.kraken_lcd_visualizer
+preset_entity: select.kraken_lcd_preset
+next_entity: button.kraken_lcd_viz_next
+random_entity: button.kraken_lcd_viz_random
+title_entity: button.kraken_lcd_title_show
+pack_entity: select.kraken_lcd_viz_pack
+cycle_entity: number.kraken_lcd_viz_cycle
+order_entity: select.kraken_lcd_viz_order
+blend_entity: number.kraken_lcd_viz_blend
+ontrack_entity: switch.kraken_lcd_viz_ontrack
+fav_entity: switch.kraken_lcd_viz_fav
+mode_entity: sensor.kraken_lcd_mode
+track_entity: sensor.kraken_lcd_track
+titles_entity: select.kraken_lcd_titles
+```
+
+It takes the full width of a sections view by default (`min_columns: 6`) and
+lays itself out in a single column on a phone.
 
 **Any command over MQTT.** Publish the command text to
 `kraken/<pc name>/command`, e.g. `next`, `pick 5`, `show https://… 20`,
