@@ -87,15 +87,15 @@ function startServer() {
     for (const info of clients.values()) {
       if (info.state && (!best || info.seen > best.seen)) best = info;
     }
-    return { lastState: best ? best.state : null, playlist: best ? best.playlist : null };
+    return { lastState: best ? best.state : null, playlist: best ? best.playlist : null, caps: best ? best.caps : null };
   }
 
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, `http://${req.headers.host || HOST}`);
-    const { lastState, playlist } = primary();
+    const { lastState, playlist, caps } = primary();
     try {
       if (url.pathname === "/status") {
-        return json(res, 200, { clients: clients.size, state: lastState });
+        return json(res, 200, { clients: clients.size, state: lastState, caps });
       }
       if (url.pathname === "/playlist") {
         if (!playlist) return json(res, 503, { error: "Kraken page has not reported its playlist yet" });
@@ -156,7 +156,7 @@ function startServer() {
       `Sec-WebSocket-Accept: ${accept}\r\n\r\n`
     );
     socket.setNoDelay(true);
-    const info = { state: null, playlist: null, seen: 0 };
+    const info = { state: null, playlist: null, caps: null, seen: 0 };
     clients.set(socket, info);
     log(`page connected (origin ${req.headers.origin || "?"}), ${clients.size} total`);
 
@@ -173,6 +173,7 @@ function startServer() {
             const msg = JSON.parse(frame.payload.toString("utf8"));
             if (msg.type === "state") { info.state = { ...msg.state, at: new Date().toISOString() }; info.seen = Date.now(); }
             if (msg.type === "playlist" && Array.isArray(msg.items)) info.playlist = msg.items;
+            if (msg.type === "caps") info.caps = msg.caps;
           } catch { /* ignore junk */ }
         }
       }

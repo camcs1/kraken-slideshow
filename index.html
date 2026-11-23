@@ -1228,6 +1228,27 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
       return "Item " + i;
     }
 
+    // What this browser can do: decides whether the MilkDrop visualizer can run here.
+    function reportCaps(){
+      const gl = (type)=>{
+        try {
+          const c = document.createElement("canvas").getContext(type);
+          if (!c) return null;
+          const dbg = c.getExtension("WEBGL_debug_renderer_info");
+          return { renderer: dbg ? c.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : c.getParameter(c.RENDERER),
+                   maxTexture: c.getParameter(c.MAX_TEXTURE_SIZE) };
+        } catch { return null; }
+      };
+      const n = (window.nzxt && window.nzxt.v1) || {};
+      bridgeSend({ type:"caps", caps:{
+        webgl2: gl("webgl2"), webgl: gl("webgl"),
+        audioContext: typeof (window.AudioContext || window.webkitAudioContext) === "function",
+        width: n.width || innerWidth, height: n.height || innerHeight,
+        shape: n.shape || null, targetFps: n.targetFps || null,
+        dpr: devicePixelRatio, userAgent: navigator.userAgent
+      }});
+    }
+
     function reportPlaylist(){
       bridgeSend({ type:"playlist", items: items.map((it, i)=>({
         index: i, name: itemName(it, i), type: it.type, src: it.src,
@@ -1334,7 +1355,7 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
       function open(){
         let ws;
         try { ws = new WebSocket(url); } catch { return retry(); }
-        ws.onopen = ()=>{ bridgeSocket = ws; delay = 2000; reportPlaylist(); reportState(); };
+        ws.onopen = ()=>{ bridgeSocket = ws; delay = 2000; reportCaps(); reportPlaylist(); reportState(); };
         ws.onmessage = (ev)=>{ try { handleRemoteCommand(JSON.parse(ev.data)); } catch {} };
         ws.onclose = ()=>{ if (bridgeSocket === ws) bridgeSocket = null; retry(); };
       }
