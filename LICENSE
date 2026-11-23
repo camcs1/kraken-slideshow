@@ -22,3 +22,10 @@ ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 
 For more information, please refer to <https://unlicense.org>
+
+---
+
+Third-party portions are not covered by this dedication and remain under their
+own licences; see THIRD_PARTY_NOTICES.md. In particular, the song-title
+animation formulas in index.html are derived from MilkDrop 2 (Copyright
+2005-2013 Nullsoft, Inc., BSD-style licence, reproduced next to that code).

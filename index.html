@@ -1309,6 +1309,8 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
        bridge/kraken-audio.py. The page never touches an audio input itself.
        CAM renders WebGL on the CPU (SwiftShader), so it draws at a reduced
        size (default 320px) and CSS scales it up to the LCD. */
+    // Butterchurn and butterchurn-presets: MIT, (c) Jordan Berg; loaded at runtime, not bundled.
+    // See THIRD_PARTY_NOTICES.md.
     const BUTTERCHURN_URL = "https://cdn.jsdelivr.net/npm/butterchurn@2.6.7/lib/butterchurn.min.js";
     // Preset packs. butterchurn-presets ships several; "weekly" is the community's
     // weekly picks (a name -> preset-JSON URL index; each preset is fetched when used).
@@ -1570,6 +1572,39 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
       if (isNightModeActive() && (o.nightAction || "black") === "black") return false;
       return titlesMode === "always" || !!(viz && viz.on);
     }
+    /* The title fly-in formulas below (scale, alpha and the six-sine wobble) are
+       ported from MilkDrop 2 / MilkDrop3, vis_milk2/milkdropfs.cpp,
+       CPlugin::ShowSongTitleAnim (https://github.com/milkdrop2077/MilkDrop3).
+       That code is under the following licence, which applies to this ported
+       portion (not to the rest of this file, which is under the Unlicense):
+
+  LICENSE
+  -------
+Copyright 2005-2013 Nullsoft, Inc.
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification,
+are permitted provided that the following conditions are met:
+
+  * Redistributions of source code must retain the above copyright notice,
+    this list of conditions and the following disclaimer.
+
+  * Redistributions in binary form must reproduce the above copyright notice,
+    this list of conditions and the following disclaimer in the documentation
+    and/or other materials provided with the distribution.
+
+  * Neither the name of Nullsoft nor the names of its contributors may be used to
+    endorse or promote products derived from this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR
+IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND
+FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER
+IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+    */
     /* MilkDrop3's song-title motion (milkdropfs.cpp ShowSongTitleAnim), 1.7 s:
          scale = 1.01 / (p^0.21 + 0.01)   starts ~100x and shrinks onto the screen
          alpha = p^0.3

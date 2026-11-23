@@ -1,2 +1,5 @@
 # Built locally by bridge/tray/build.ps1
 bridge/KrakenBridge.exe
+
+# Claude Code agent worktrees and local settings
+.claude/

@@ -179,3 +179,17 @@ https://example.com/door.jpg {"name":"Front Door"}
 - Settings live in **localStorage** on each PC. Moving the page to a different
   URL starts with an empty playlist (use export/import in Configure).
 - The bridge and visualizer helper only accept connections from the same PC.
+
+---
+
+## Credits & licence
+- Visualizer: [Butterchurn](https://github.com/jberg/butterchurn) and
+  [butterchurn-presets](https://github.com/jberg/butterchurn-presets) by Jordan Berg
+  (MIT), loaded from jsDelivr; presets by the MilkDrop preset community.
+- Track-title motion ported from [MilkDrop3](https://github.com/milkdrop2077/MilkDrop3)'s
+  `ShowSongTitleAnim` (MilkDrop 2 code, © Nullsoft, Inc., BSD-style licence).
+- MilkDrop was created by Ryan Geiss.
+- Audio capture uses [SoundCard](https://github.com/bastibe/SoundCard) (BSD-3).
+
+This project's own code is public domain under the [Unlicense](LICENSE);
+third-party parts keep their own licences ([THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)).
