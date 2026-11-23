@@ -51,6 +51,7 @@ it stays 0, restart CAM, or wait 30s after starting the bridge.
 |---|---|---|
 | `next` / `prev` | `/next`, `/prev` | Step through the playlist |
 | `pick Doorbell Cam` / `pick 2` | `/pick?name=Doorbell%20Cam`, `/pick?index=2` | Show one playlist item and **hold it** (videos loop) until `slideshow` |
+| `hold` | `/hold` | Pick whatever is on the screen right now |
 | `slideshow` | `/slideshow` | **Return to the slideshow**, at the spot the rotation was at before the first pick. Also ends a `pause` or an untimed `show` |
 | `goto 3` | `/goto?index=3` | Jump to item 3 (0-based) and keep rotating from there |
 | `pause` / `resume` | `/pause`, `/resume` | Freeze on the current item / continue (`resume` = `slideshow`) |
@@ -75,90 +76,53 @@ is running but CAM's page hasn't connected.
 
 ## HASS.Agent setup
 
-In HASS.Agent, go to **Commands → Add New**. Pick the **PowerShell** type and
-use entity type **button**. One command per action:
+This is the setup running on GAMINGPC. HASS.Agent **actions** append an MQTT
+payload to a command's arguments, so one command handles every bridge action.
 
-| Name | Command |
-|---|---|
-| Kraken Next | `Invoke-RestMethod http://127.0.0.1:27880/next` |
-| Kraken Previous | `Invoke-RestMethod http://127.0.0.1:27880/prev` |
-| Kraken Pause | `Invoke-RestMethod http://127.0.0.1:27880/pause` |
-| Kraken Slideshow | `Invoke-RestMethod http://127.0.0.1:27880/slideshow` |
-| Kraken Night On | `Invoke-RestMethod "http://127.0.0.1:27880/night?mode=on"` |
-| Kraken Night Auto | `Invoke-RestMethod "http://127.0.0.1:27880/night?mode=auto"` |
+**Command.** Add a **Custom** command named `GAMINGPC_Kraken`, entity type
+**button**, with the command:
 
-They appear in Home Assistant as `button.<pc>_kraken_next` and so on. Press them
-from dashboards or automations with `button.press`.
-
-### Picking an image from Home Assistant
-
-HASS.Agent **actions** append an MQTT payload to a command's arguments. That
-gives you one command that takes any bridge action as its payload.
-
-1. **Command:** add a **Custom** command named `Kraken`, entity type
-   **button**, with the command
-   `node "C:\Scripts\kraken-slideshow\bridge\kraken-bridge.js" send`.
-   Save it, select it, and click **show mqtt action topic**. Copy the topic
-   (something like `homeassistant/button/<pc>/<pc>_kraken/action`).
-2. **Playlist sensor:** add a **PowerShell** sensor named `Kraken Playlist`:
-   `(node "C:\Scripts\kraken-slideshow\bridge\kraken-bridge.js" playlist names) -join '|'`.
-   An HA state is capped at 255 characters, so this suits playlists with short
-   names. For long lists, give items short `name` options.
-3. **Now showing sensor** (optional): another PowerShell sensor,
-   `(Invoke-RestMethod http://127.0.0.1:27880/status).state.mode`.
-4. **Home Assistant:** create an `input_select.kraken_pick` helper (any
-   placeholder option) and these two automations. Replace the topic with yours,
-   and the sensor entity with whatever HASS.Agent named it:
-
-```yaml
-# Keep the dropdown's options in sync with the slideshow's playlist
-alias: Kraken - refresh picker options
-triggers:
-  - trigger: state
-    entity_id: sensor.mypc_kraken_playlist
-actions:
-  - action: input_select.set_options
-    target:
-      entity_id: input_select.kraken_pick
-    data:
-      options: >
-        {{ ['Slideshow'] + states('sensor.mypc_kraken_playlist').split('|') }}
+```
+C:\Scripts\kraken-slideshow\bridge\kraken.cmd
 ```
 
-```yaml
-# Choosing an option shows it on the Kraken; choosing "Slideshow" returns to rotation
-alias: Kraken - pick from dropdown
-triggers:
-  - trigger: state
-    entity_id: input_select.kraken_pick
-    not_from: unavailable
-actions:
-  - action: mqtt.publish
-    data:
-      topic: homeassistant/button/mypc/mypc_kraken/action
-      payload: >
-        {{ 'slideshow' if trigger.to_state.state == 'Slideshow'
-           else 'pick ' ~ trigger.to_state.state }}
-```
+It has to be the `.cmd` wrapper, a single path with no arguments. HASS.Agent
+wraps the whole configured command in quotes before appending the payload, so
+`node "...\kraken-bridge.js" send` becomes `"node "..." send" next`, which
+Windows can't run. Its action topic is
+`homeassistant/button/GAMINGPC/GAMINGPC_Kraken/action` (the **show mqtt action
+topic** button shows it).
 
-The same command takes any other action as its payload: `next`, `night on`,
-`show https://… 20`, and so on. A plain script that publishes `slideshow` to the
-topic makes a good dashboard button for returning to the slideshow.
+**Sensors.** Three **PowerShell** sensors, every 10 seconds, using
+[kraken-sensor.ps1](kraken-sensor.ps1):
 
-The bridge accepts the payload either as separate words or as one quoted
-argument, so you don't need to escape quotes for names with spaces.
+| Sensor | Query | Example state |
+|---|---|---|
+| `GAMINGPC_kraken_mode` | `& 'C:\Scripts\kraken-slideshow\bridge\kraken-sensor.ps1' -Field mode` | `slideshow`, `picked`, `paused`, `remote`, `offline` |
+| `GAMINGPC_kraken_position` | `... -Field position` | `20 / 56` |
+| `GAMINGPC_kraken_src` | `... -Field src` | URL of what's on the screen |
+
+A playlist-names sensor doesn't work for long playlists: HA caps a state at 255
+characters, and 56 Reddit-style IDs is about 800.
+
+**Home Assistant** (created through HA-MCP):
+
+- `script.kraken_command`: field `command`, publishes it to the action topic
+  (mode `queued`). Every control calls this, e.g. `command: next`.
+- `input_text.kraken_pick` plus `automation.kraken_pick_from_text_box`: type a
+  number (1-based, as the position sensor shows) or an item name, and that item
+  is held. The box clears itself afterwards.
+- Overview dashboard, **PC** view, **Kraken LCD** section: now-showing preview,
+  Previous / Hold this / Next / Slideshow / Night on / Night auto / Reload
+  buttons, and the pick box.
 
 **Pushing a specific image** (doorbell snapshot, alert graphic): make a fixed
 command per image, e.g.
 `Invoke-RestMethod "http://127.0.0.1:27880/show?url=https://example.com/doorbell.jpg&seconds=20"`.
-Or use the `Kraken` action command above with payload `show <url> 20`. The URL
+Or call `script.kraken_command` with `command: show <url> 20`. The URL
 must be loadable by CAM's browser. Watch out for an `http://` Home Assistant
 URL, which an https page may refuse to load as mixed content. An https URL is
 safest.
-
-**Status sensor** (optional): add a **PowerShell** sensor with
-`(Invoke-RestMethod http://127.0.0.1:27880/status).state.src`
-to see what's on the screen from Home Assistant.
 
 ## Settings
 

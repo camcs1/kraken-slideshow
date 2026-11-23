@@ -14,6 +14,7 @@
  *                   node kraken-bridge.js send show https://example.com/a.jpg 30
  *                   node kraken-bridge.js send night on|off|auto
  *                   node kraken-bridge.js send pick Doorbell Cam   (name or index; holds it)
+ *                   node kraken-bridge.js send hold                 (hold what's showing now)
  *                   node kraken-bridge.js send slideshow            (back to rotation)
  *                   node kraken-bridge.js status
  *                   node kraken-bridge.js playlist [names]
@@ -28,7 +29,7 @@ const crypto = require("crypto");
 
 const HOST = process.env.KRAKEN_BRIDGE_HOST || "127.0.0.1";
 const PORT = Number(process.env.KRAKEN_BRIDGE_PORT || 27880);
-const ACTIONS = new Set(["next", "prev", "pause", "resume", "slideshow", "pick", "show", "goto", "night", "reload"]);
+const ACTIONS = new Set(["next", "prev", "pause", "resume", "slideshow", "pick", "hold", "show", "goto", "night", "reload"]);
 
 /* ------------------------------------------------------------------ CLI */
 if (["send", "status", "playlist"].includes(process.argv[2])) {
@@ -75,12 +76,23 @@ async function runCli(argv) {
 
 /* --------------------------------------------------------------- server */
 function startServer() {
-  const clients = new Set();
-  let lastState = null;
-  let playlist = null;   // [{index, name, type, src}] as last reported by the page
+  // socket -> { state, playlist, seen } as reported by that page. Kept per
+  // connection so a second page (a test tab) can't overwrite the Kraken's data,
+  // and a page's data disappears when it disconnects.
+  const clients = new Map();
+
+  // Report state/playlist from the page that spoke most recently, as a pair.
+  function primary() {
+    let best = null;
+    for (const info of clients.values()) {
+      if (info.state && (!best || info.seen > best.seen)) best = info;
+    }
+    return { lastState: best ? best.state : null, playlist: best ? best.playlist : null };
+  }
 
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, `http://${req.headers.host || HOST}`);
+    const { lastState, playlist } = primary();
     try {
       if (url.pathname === "/status") {
         return json(res, 200, { clients: clients.size, state: lastState });
@@ -110,6 +122,11 @@ function startServer() {
       if (problem) return json(res, 400, { error: problem });
       if (!clients.size) return json(res, 503, { error: "Kraken page is not connected" });
 
+      // "hold" = pick whatever the page last reported it was showing.
+      if (cmd.action === "hold") {
+        if (!lastState || !Number.isInteger(lastState.index)) return json(res, 503, { error: "Kraken page has not reported what it is showing yet" });
+        cmd = { action: "pick", index: lastState.index };
+      }
       if (cmd.action === "pick") {
         const hit = resolvePick(playlist, cmd);
         if (hit.error) return json(res, hit.status, { error: hit.error, names: playlist ? playlist.map(p => p.name) : undefined });
@@ -139,7 +156,8 @@ function startServer() {
       `Sec-WebSocket-Accept: ${accept}\r\n\r\n`
     );
     socket.setNoDelay(true);
-    clients.add(socket);
+    const info = { state: null, playlist: null, seen: 0 };
+    clients.set(socket, info);
     log(`page connected (origin ${req.headers.origin || "?"}), ${clients.size} total`);
 
     let buf = Buffer.alloc(0);
@@ -153,8 +171,8 @@ function startServer() {
         if (frame.opcode === 0x1) {
           try {
             const msg = JSON.parse(frame.payload.toString("utf8"));
-            if (msg.type === "state") lastState = { ...msg.state, at: new Date().toISOString() };
-            if (msg.type === "playlist" && Array.isArray(msg.items)) playlist = msg.items;
+            if (msg.type === "state") { info.state = { ...msg.state, at: new Date().toISOString() }; info.seen = Date.now(); }
+            if (msg.type === "playlist" && Array.isArray(msg.items)) info.playlist = msg.items;
           } catch { /* ignore junk */ }
         }
       }
@@ -168,7 +186,7 @@ function startServer() {
 
   // Keep idle connections alive and notice dead ones.
   setInterval(() => {
-    for (const s of clients) s.write(encodeFrame(Buffer.alloc(0), 0x9));
+    for (const s of clients.keys()) s.write(encodeFrame(Buffer.alloc(0), 0x9));
   }, 30000).unref();
 
   server.listen(PORT, HOST, () => log(`listening on http://${HOST}:${PORT} (ws path /ws)`));
@@ -230,7 +248,7 @@ function encodeFrame(payload, opcode = 0x1) {
 
 function broadcast(clients, obj) {
   const frame = encodeFrame(Buffer.from(JSON.stringify(obj), "utf8"));
-  for (const s of clients) s.write(frame);
+  for (const s of clients.keys()) s.write(frame);
 }
 
 /* --------------------------------------------------------------- helpers */
