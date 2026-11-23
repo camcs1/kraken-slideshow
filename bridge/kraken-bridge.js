@@ -16,7 +16,11 @@
  *                   node kraken-bridge.js send pick Doorbell Cam   (name or index; holds it)
  *                   node kraken-bridge.js send hold                 (hold what's showing now)
  *                   node kraken-bridge.js send slideshow            (back to rotation)
+ *                   node kraken-bridge.js send visualizer on [preset words]
+ *                   node kraken-bridge.js send visualizer next|prev|random|off
+ *                   node kraken-bridge.js send visualizer res 480
  *                   node kraken-bridge.js status
+ *                   node kraken-bridge.js presets
  *                   node kraken-bridge.js playlist [names]
  *
  * Words after the action are joined with spaces, so HASS.Agent can append an
@@ -26,13 +30,19 @@
 
 const http = require("http");
 const crypto = require("crypto");
+const dgram = require("dgram");
+const path = require("path");
+const { spawn } = require("child_process");
 
 const HOST = process.env.KRAKEN_BRIDGE_HOST || "127.0.0.1";
 const PORT = Number(process.env.KRAKEN_BRIDGE_PORT || 27880);
-const ACTIONS = new Set(["next", "prev", "pause", "resume", "slideshow", "pick", "hold", "show", "goto", "night", "reload"]);
+const AUDIO_PORT = Number(process.env.KRAKEN_AUDIO_PORT || 27881);       // UDP from kraken-audio.py
+const PYTHON = process.env.KRAKEN_PYTHON || "python";
+const ACTIONS = new Set(["next", "prev", "pause", "resume", "slideshow", "pick", "hold", "show", "goto", "night", "reload", "visualizer"]);
+const VIZ_MODES = ["on", "off", "next", "prev", "random", "res"];
 
 /* ------------------------------------------------------------------ CLI */
-if (["send", "status", "playlist"].includes(process.argv[2])) {
+if (["send", "status", "playlist", "presets"].includes(process.argv[2])) {
   runCli(process.argv.slice(2)).catch(err => {
     console.error(err.message);
     process.exit(1);
@@ -51,6 +61,12 @@ function cliArgsToCommand([action, ...rest]) {
     case "goto":  return { action, index: Number(rest[0]) };
     case "pick":  return /^\d+$/.test(text) ? { action, index: Number(text) } : { action, name: text };
     case "night": return { action, mode: (rest[0] || "auto").toLowerCase() };
+    case "visualizer": {
+      const mode = (rest[0] || "on").toLowerCase();
+      const arg = rest.slice(1).join(" ").trim();
+      if (mode === "res") return { action, mode, value: Number(arg) };
+      return arg ? { action, mode, preset: arg } : { action, mode };
+    }
     default:      return { action };
   }
 }
@@ -62,6 +78,8 @@ async function runCli(argv) {
     res = await fetch(`${base}/status`);
   } else if (argv[0] === "playlist") {
     res = await fetch(`${base}/playlist${argv[1] === "names" ? "?format=names" : ""}`);
+  } else if (argv[0] === "presets") {
+    res = await fetch(`${base}/presets`);
   } else {
     res = await fetch(`${base}/command`, {
       method: "POST",
@@ -87,15 +105,67 @@ function startServer() {
     for (const info of clients.values()) {
       if (info.state && (!best || info.seen > best.seen)) best = info;
     }
-    return { lastState: best ? best.state : null, playlist: best ? best.playlist : null, caps: best ? best.caps : null };
+    return { lastState: best ? best.state : null, playlist: best ? best.playlist : null,
+             caps: best ? best.caps : null, presets: best ? best.presets : null };
   }
+
+  /* --- Audio for the visualizer ---------------------------------------
+     kraken-audio.py captures system audio and sends 2048-byte UDP datagrams
+     here; each one goes to the pages as a binary WebSocket frame. The helper
+     only runs while the page is in visualizer mode. */
+  let audioProc = null;
+  let audioStartedAt = 0;
+  let audioPackets = 0, audioRate = 0;
+
+  function startAudio() {
+    if (audioProc) return;
+    const script = path.join(__dirname, "kraken-audio.py");
+    const proc = spawn(PYTHON, [script, "--port", String(AUDIO_PORT)], { stdio: ["pipe", "pipe", "pipe"], windowsHide: true });
+    audioProc = proc;
+    audioStartedAt = Date.now();
+    log(`audio helper started (pid ${proc.pid})`);
+    const relayLog = d => String(d).split(/\r?\n/).filter(Boolean).forEach(l => log(`audio: ${l}`));
+    proc.stdout.on("data", relayLog);
+    proc.stderr.on("data", relayLog);
+    proc.on("error", err => log(`audio helper failed to start: ${err.message}`));
+    proc.on("exit", code => {
+      log(`audio helper exited (${code})`);
+      if (audioProc === proc) audioProc = null;
+    });
+  }
+
+  function stopAudio() {
+    const proc = audioProc;
+    if (!proc) return;
+    audioProc = null;
+    try { proc.stdin.end(); } catch {}            // the helper exits on stdin EOF
+    setTimeout(() => { if (proc.exitCode === null) proc.kill(); }, 2000).unref();
+  }
+
+  const udp = dgram.createSocket("udp4");
+  udp.on("message", msg => {
+    audioPackets++;
+    const frame = encodeFrame(msg, 0x2);
+    for (const s of clients.keys()) {
+      // Never queue audio: if a page is behind, drop this frame for it.
+      if (s.writableLength < 64 * 1024) s.write(frame);
+    }
+  });
+  udp.on("error", err => log(`audio UDP error: ${err.message}`));
+  udp.bind(AUDIO_PORT, "127.0.0.1");
+  setInterval(() => { audioRate = audioPackets / 5; audioPackets = 0; }, 5000).unref();
 
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, `http://${req.headers.host || HOST}`);
-    const { lastState, playlist, caps } = primary();
+    const { lastState, playlist, caps, presets } = primary();
     try {
       if (url.pathname === "/status") {
-        return json(res, 200, { clients: clients.size, state: lastState, caps });
+        return json(res, 200, { clients: clients.size, state: lastState, caps,
+                                audio: { running: !!audioProc, packetsPerSec: audioRate } });
+      }
+      if (url.pathname === "/presets") {
+        if (!presets) return json(res, 503, { error: "visualizer presets not loaded yet (turn the visualizer on once)" });
+        return json(res, 200, { count: presets.length, names: presets });
       }
       if (url.pathname === "/playlist") {
         if (!playlist) return json(res, 503, { error: "Kraken page has not reported its playlist yet" });
@@ -131,6 +201,11 @@ function startServer() {
         const hit = resolvePick(playlist, cmd);
         if (hit.error) return json(res, hit.status, { error: hit.error, names: playlist ? playlist.map(p => p.name) : undefined });
         cmd = { action: "pick", index: hit.item.index, name: hit.item.name };
+      }
+
+      if (cmd.action === "visualizer") {
+        if (cmd.mode === "off") stopAudio();
+        else if (cmd.mode !== "res") startAudio();
       }
 
       broadcast(clients, cmd);
@@ -171,15 +246,22 @@ function startServer() {
         if (frame.opcode === 0x1) {
           try {
             const msg = JSON.parse(frame.payload.toString("utf8"));
-            if (msg.type === "state") { info.state = { ...msg.state, at: new Date().toISOString() }; info.seen = Date.now(); }
+            if (msg.type === "state") {
+              info.state = { ...msg.state, at: new Date().toISOString() }; info.seen = Date.now();
+              // Page left visualizer mode (a slideshow command, a reload): stop capturing.
+              // The grace period covers state reports already in flight when it started.
+              if (msg.state.mode !== "visualizer" && audioProc && Date.now() - audioStartedAt > 5000) stopAudio();
+            }
             if (msg.type === "playlist" && Array.isArray(msg.items)) info.playlist = msg.items;
             if (msg.type === "caps") info.caps = msg.caps;
+            if (msg.type === "presets" && Array.isArray(msg.names)) info.presets = msg.names;
           } catch { /* ignore junk */ }
         }
       }
     });
     const drop = () => {
       if (clients.delete(socket)) log(`page disconnected, ${clients.size} left`);
+      if (!clients.size) stopAudio();
     };
     socket.on("close", drop);
     socket.on("error", drop);
@@ -201,6 +283,11 @@ function validate(cmd) {
   if (cmd.action === "pick" && !Number.isInteger(cmd.index) && !String(cmd.name || "").trim())
     return "pick needs a name or an integer index";
   if (cmd.action === "night" && !["on", "off", "auto"].includes(cmd.mode)) return "night mode must be on, off or auto";
+  if (cmd.action === "visualizer") {
+    cmd.mode = cmd.mode || "on";
+    if (!VIZ_MODES.includes(cmd.mode)) return `visualizer mode must be one of: ${VIZ_MODES.join(", ")}`;
+    if (cmd.mode === "res" && !(cmd.value >= 128 && cmd.value <= 1024)) return "visualizer res needs a size from 128 to 1024";
+  }
   return null;
 }
 
