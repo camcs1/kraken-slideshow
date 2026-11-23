@@ -74,6 +74,46 @@ works too.
 The status `"error":"Kraken page is not connected"` (HTTP 503) means the bridge
 is running but CAM's page hasn't connected.
 
+## MilkDrop visualizer
+
+`visualizer on` replaces the slideshow with a MilkDrop visualizer
+([Butterchurn](https://github.com/jberg/butterchurn), 100 presets) reacting to
+whatever the PC is playing. Any slideshow command (`slideshow`, `next`,
+`pick`…) or `visualizer off` goes back.
+
+| Command | Effect |
+|---|---|
+| `visualizer on [preset words]` | Start, optionally on the first preset whose name contains the words |
+| `visualizer next` / `prev` / `random` | Change preset (2.7 s blend) |
+| `visualizer res 256` | Internal render size, 128–1024 (default 192; scaled up to the LCD) |
+| `visualizer fps 20` | Frame cap, 5–60 (default none) |
+| `visualizer off` | Back to the slideshow |
+| `presets` (CLI) / `/presets` | Preset names (after the first `visualizer on`) |
+
+**How the audio gets there.** On `visualizer on` the bridge starts
+[kraken-audio.py](kraken-audio.py), which records the default output device
+with WASAPI loopback and sends ~60 UDP packets a second to the bridge on port
+27881. The bridge forwards each one to the page as a binary WebSocket frame,
+dropping rather than queueing if the page falls behind. The helper is stopped
+when the page leaves visualizer mode or disconnects, and it exits on its own if
+the bridge dies. It needs Python with `pip install --user soundcard`
+(`KRAKEN_PYTHON` overrides the interpreter).
+
+**Performance.** CAM's browser renders WebGL in software (SwiftShader, on the
+CPU), so the visualizer costs CPU in proportion to its pixel count. CAM also
+ticks animation frames at about 40 Hz, so a frame cap only skips whole frames
+(a 30 cap gives 20 fps). Measured on GAMINGPC, whole CAM process:
+
+| Setting | fps | CAM CPU |
+|---|---|---|
+| Slideshow (baseline) | n/a | ~0.65 core |
+| 192 px (default) | 40 | ~1.5–2 cores |
+| 256 px | 40 | ~3.4 cores |
+| 256 px, cap 30 | 20 | ~2.3 cores |
+| 320 px | 40 | ~4 cores |
+
+Night mode set to *black* pauses rendering entirely.
+
 ## HASS.Agent setup
 
 This is the setup running on GAMINGPC. HASS.Agent **actions** append an MQTT
@@ -113,8 +153,9 @@ characters, and 56 Reddit-style IDs is about 800.
   number (1-based, as the position sensor shows) or an item name, and that item
   is held. The box clears itself afterwards.
 - Overview dashboard, **PC** view, **Kraken LCD** section: now-showing preview,
-  Previous / Hold this / Next / Slideshow / Night on / Night auto / Reload
-  buttons, and the pick box.
+  Previous / Hold this / Next / Slideshow / Night on / Night auto / Reload /
+  Visualizer / Next preset / Random preset buttons, and the pick box. In
+  visualizer mode the position sensor shows the preset name and fps.
 
 **Pushing a specific image** (doorbell snapshot, alert graphic): make a fixed
 command per image, e.g.
