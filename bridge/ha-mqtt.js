@@ -126,7 +126,7 @@ module.exports = function startHaMqtt(opts) {
       state_topic: `${base}/state`,
       value_template: "{{ 'ON' if value_json.viz_fav else 'OFF' }}",
       json_attributes_topic: `${base}/state`,
-      json_attributes_template: "{{ {'favourites': value_json.viz_favorites} | tojson }}",
+      json_attributes_template: "{{ {'favourites': value_json.viz_favorites, 'names': value_json.viz_favorite_names | default([])} | tojson }}",
     })]);
     out.push(["select", "titles", common("select", "titles", "Track titles", {
       icon: "mdi:music-note-eighth",

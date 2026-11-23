@@ -2004,7 +2004,8 @@ https://example.com/door.jpg {&quot;name&quot;:&quot;Front Door&quot;, &quot;sec
                             presets: viz.keys.length, error: viz.error,
                             pack: vizSettings.pack, cycle: vizSettings.cycle, order: vizSettings.order,
                             blend: vizSettings.blend, onTrack: vizSettings.onTrack,
-                            favorite: vizIsFav(viz.name), favorites: vizFavs.length } : null
+                            favorite: vizIsFav(viz.name), favorites: vizFavs.length,
+                            favoriteNames: vizFavs.map(f=>f.name) } : null
       }});
     }
 
