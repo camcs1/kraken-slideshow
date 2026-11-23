@@ -423,8 +423,12 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
     if (optStr) { try { Object.assign(it, JSON.parse(optStr)); } catch {} }
     return it;
   }
+  // Keys the editor manages itself; anything else in an item (future or hand-written
+  // options) is passed through untouched so a load/save round trip never drops it.
+  const OPT_MANAGED = ["src","type","name","seconds","loop","maxSeconds","fit","at","only","scale","rotDeg","txPct","tyPct"];
   function itemToOptString(it){
     const o = {};
+    if (it.name !== undefined && it.name !== null && String(it.name).trim() !== "") o.name = it.name;
     if (it.type === "image" && it.seconds) o.seconds = it.seconds;
     if (it.type === "video"){
       if (typeof it.loop === "boolean") o.loop = it.loop;
@@ -435,6 +439,9 @@ https://example.com/b.gif {&quot;seconds&quot;:45}"></textarea>
     if (it.only) o.only = true;
     ["scale","rotDeg","txPct","tyPct"].forEach(k=>{
       if (it[k] !== undefined && it[k] !== null && it[k] !== "") o[k] = it[k];
+    });
+    Object.keys(it).forEach(k=>{
+      if (!OPT_MANAGED.includes(k) && it[k] !== undefined) o[k] = it[k];
     });
     return Object.keys(o).length ? JSON.stringify(o) : "";
   }
