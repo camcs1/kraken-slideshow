@@ -92,7 +92,9 @@ name without its extension (`.../Doorbell%20Cam.jpg` → `Doorbell Cam`). Set
 listing the valid names.
 
 `POST /command` with a JSON body such as `{"action":"show","url":"…","seconds":20}`
-works too.
+works too. Add `?wait=1` to get the page's state after the command in the reply
+(`"state":{…}`, normally within a few ms, at most 2 s). The Stream Deck toggle keys
+use this so their icon changes on the press, not on the next status poll.
 
 The status `"error":"Kraken page is not connected"` (HTTP 503) means the bridge
 is running but CAM's page hasn't connected.

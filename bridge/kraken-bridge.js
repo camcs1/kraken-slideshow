@@ -114,6 +114,18 @@ function startServer() {
   // connection so a second page (a test tab) can't overwrite the Kraken's data,
   // and a page's data disappears when it disconnects.
   const clients = new Map();
+  // POST /command?wait=1 holds its reply until the page's next state report (it
+  // reports after every command, within milliseconds), so a Stream Deck toggle can
+  // show the new state at once. Gives up after STATE_WAIT_MS.
+  const stateWaiters = new Set();
+  const STATE_WAIT_MS = 2000;
+  function nextState() {
+    return new Promise(ok => {
+      const done = () => { clearTimeout(timer); stateWaiters.delete(done); ok(); };
+      const timer = setTimeout(done, STATE_WAIT_MS);
+      stateWaiters.add(done);
+    });
+  }
 
   // Report state/playlist from the page that spoke most recently, as a pair.
   function primary() {
@@ -262,6 +274,10 @@ function startServer() {
         return json(res, 404, { error: "not found" });
       }
       const r = dispatch(cmd);
+      if (r.status === 200 && url.searchParams.has("wait")) {
+        await nextState();
+        r.body = { ...r.body, state: primary().lastState };
+      }
       json(res, r.status, r.body);
     } catch (err) {
       json(res, 400, { error: err.message });
@@ -390,6 +406,7 @@ function startServer() {
             const msg = JSON.parse(frame.payload.toString("utf8"));
             if (msg.type === "state") {
               info.state = { ...msg.state, at: new Date().toISOString() }; info.seen = Date.now();
+              for (const done of [...stateWaiters]) done();
               // Page left visualizer mode (a slideshow command, a reload): stop capturing.
               // The grace period covers state reports already in flight when it started.
               if (msg.state.mode !== "visualizer" && audioProc && Date.now() - audioStartedAt > 5000) stopAudio();
