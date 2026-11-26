@@ -25,6 +25,8 @@
  *                   node kraken-bridge.js send visualizer blend 2.7
  *                   node kraken-bridge.js send visualizer ontrack on|off
  *                   node kraken-bridge.js send visualizer fav [on|off|toggle]   (current preset)
+ *                   node kraken-bridge.js send visualizer toggle|unblock
+ *                   node kraken-bridge.js send night on|off|auto|toggle
  *                   node kraken-bridge.js send titles visualizer|always|off|show
  *                   node kraken-bridge.js send interval 30   (seconds per image)
  *                   node kraken-bridge.js status
@@ -47,7 +49,7 @@ const PORT = Number(process.env.KRAKEN_BRIDGE_PORT || 27880);
 const AUDIO_PORT = Number(process.env.KRAKEN_AUDIO_PORT || 27881);       // UDP from kraken-audio.py
 const PYTHON = process.env.KRAKEN_PYTHON || "python";
 const ACTIONS = new Set(["next", "prev", "pause", "resume", "slideshow", "pick", "hold", "show", "goto", "night", "reload", "visualizer", "titles", "interval"]);
-const VIZ_MODES = ["on", "off", "next", "prev", "random", "res", "fps", "pack", "cycle", "order", "blend", "ontrack", "fav"];
+const VIZ_MODES = ["on", "off", "toggle", "next", "prev", "random", "res", "fps", "pack", "cycle", "order", "blend", "ontrack", "fav", "unblock"];
 const VIZ_PACKS = ["default", "extra", "extra2", "md1", "minimal", "weekly", "all", "favorites"];
 const TITLE_MODES = ["visualizer", "always", "off", "show"];   // when the page pops the track title
 
@@ -287,7 +289,7 @@ function startServer() {
 
     if (cmd.action === "visualizer") {
       if (cmd.mode === "off") stopAudio();
-      else if (!["res", "fps", "pack", "cycle", "order", "blend", "ontrack", "fav"].includes(cmd.mode)) startAudio();   // settings don't start it
+      else if (!["res", "fps", "pack", "cycle", "order", "blend", "ontrack", "fav", "toggle", "unblock"].includes(cmd.mode)) startAudio();   // settings don't start it; toggle follows the page's state report
     }
 
     broadcast(clients, cmd);
@@ -342,6 +344,7 @@ function startServer() {
       viz_blend: v && typeof v.blend === "number" ? v.blend : 2.7,
       viz_ontrack: !!(v && v.onTrack),
       viz_fav: !!(v && v.favorite),
+      viz_blocked: v && typeof v.blocked === "number" ? v.blocked : 0,
       viz_favorites: v && typeof v.favorites === "number" ? v.favorites : 0,
       viz_favorite_names: v && Array.isArray(v.favoriteNames) ? v.favoriteNames.filter(n => typeof n === "string") : [],
       track: nowPlaying.title ? (nowPlaying.artist ? `${nowPlaying.artist} – ${nowPlaying.title}` : nowPlaying.title) : "",
@@ -396,6 +399,7 @@ function startServer() {
             }
             if (msg.type === "playlist" && Array.isArray(msg.items)) { info.playlist = msg.items; haUpdate(); }
             if (msg.type === "caps") info.caps = msg.caps;
+            if (msg.type === "log" && typeof msg.text === "string") log(`page: ${msg.text.slice(0, 300)}`);
             if (msg.type === "presets" && Array.isArray(msg.names)) { info.presets = msg.names; haUpdate(); }
           } catch { /* ignore junk */ }
         }
@@ -425,7 +429,7 @@ function validate(cmd) {
   if (cmd.action === "goto" && !Number.isInteger(cmd.index)) return "goto needs an integer index";
   if (cmd.action === "pick" && !Number.isInteger(cmd.index) && !String(cmd.name || "").trim())
     return "pick needs a name or an integer index";
-  if (cmd.action === "night" && !["on", "off", "auto"].includes(cmd.mode)) return "night mode must be on, off or auto";
+  if (cmd.action === "night" && !["on", "off", "auto", "toggle"].includes(cmd.mode)) return "night mode must be on, off, auto or toggle";
   if (cmd.action === "interval" && !(Number.isInteger(cmd.seconds) && cmd.seconds >= 1 && cmd.seconds <= 3600))
     return "interval needs whole seconds from 1 to 3600";
   if (cmd.action === "titles" && !TITLE_MODES.includes(cmd.mode)) return `titles must be one of: ${TITLE_MODES.join(", ")}`;

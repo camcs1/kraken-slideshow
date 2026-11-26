@@ -2006,7 +2006,8 @@ https://example.com/door.jpg {&quot;name&quot;:&quot;Front Door&quot;, &quot;sec
                             pack: vizSettings.pack, cycle: vizSettings.cycle, order: vizSettings.order,
                             blend: vizSettings.blend, onTrack: vizSettings.onTrack,
                             favorite: vizIsFav(viz.name), favorites: vizFavs.length,
-                            favoriteNames: vizFavs.map(f=>f.name) } : null
+                            favoriteNames: vizFavs.map(f=>f.name),
+                            blocked: vizBlocked.length, lastBlocked: vizLastBlocked } : null
       }});
     }
 
@@ -2042,6 +2043,37 @@ https://example.com/door.jpg {&quot;name&quot;:&quot;Front Door&quot;, &quot;sec
     try { Object.assign(vizSettings, JSON.parse(localStorage.getItem("krakenViz") || "{}")); } catch {}
     if (!VIZ_PACKS[vizSettings.pack]) vizSettings.pack = "default";
     function vizSaveSettings(){ try { localStorage.setItem("krakenViz", JSON.stringify(vizSettings)); } catch {} }
+
+    /* Preset watchdog. CAM renders WebGL on the CPU (SwiftShader) and some presets
+       are too heavy for it: the GPU process pins every core and the page stops
+       (no drawing, no commands) until Chromium's GPU watchdog kills that process.
+       - Each newly loaded preset is "on probation" for VIZ_PROBATION_MS. Its name
+         is saved first, so if the page dies or hangs before probation ends, the
+         next page start blocklists it.
+       - During probation, animation frames more than VIZ_SLOW_MS apart count as
+         slow; VIZ_SLOW_LIMIT of them blocklists the preset and moves on.
+       - A lost WebGL context (the GPU process was killed) blocklists the preset
+         that was loading, then reloads the page and restarts the visualizer.
+       Blocklisted presets are skipped by next/prev/random/auto-change/new track. */
+    const VIZ_PROBATION_MS = 10000, VIZ_SLOW_MS = 400, VIZ_SLOW_LIMIT = 4;
+    let vizBlocked = [];
+    try { vizBlocked = JSON.parse(localStorage.getItem("krakenVizBlock") || "[]").filter(n=>typeof n === "string"); } catch {}
+    let vizLastBlocked = null;
+    function vizBlock(name, why){
+      if (!name || vizBlocked.includes(name)) return;
+      vizBlocked.push(name);
+      try { localStorage.setItem("krakenVizBlock", JSON.stringify(vizBlocked)); } catch {}
+      vizLastBlocked = { name, why, at: new Date().toISOString() };
+      bridgeSend({ type:"log", text:`visualizer: blocked preset "${name}" (${why})` });
+    }
+    function vizProbation(name){
+      viz.probation = { name, at: performance.now(), slow: 0 };
+      try { localStorage.setItem("krakenVizSuspect", JSON.stringify({ name, at: Date.now() })); } catch {}
+    }
+    function vizEndProbation(){
+      viz.probation = null;
+      try { localStorage.removeItem("krakenVizSuspect"); } catch {}
+    }
     const vizCanvas = document.getElementById("vizCanvas");
     viz = {
       on:false, engine:null, ctx:null, presets:null, keys:[], index:-1, name:null,
@@ -2053,6 +2085,26 @@ https://example.com/door.jpg {&quot;name&quot;:&quot;Front Door&quot;, &quot;sec
                timeByteArrayL:new Uint8Array(1024).fill(128),
                timeByteArrayR:new Uint8Array(1024).fill(128) }
     };
+
+    // A preset still on probation when the page last went away hung or crashed it.
+    try {
+      const s = JSON.parse(localStorage.getItem("krakenVizSuspect") || "null");
+      localStorage.removeItem("krakenVizSuspect");
+      if (s && s.name && Date.now() - s.at < 15 * 60000) vizBlock(s.name, "page stopped while it was loading");
+    } catch {}
+
+    // GPU process killed (usually by Chromium's watchdog after a preset hung it):
+    // blocklist the likely culprit, reload, and come back on another preset.
+    vizCanvas.addEventListener("webglcontextlost", e=>{
+      e.preventDefault();
+      if (!viz.on) return;
+      if (viz.probation) vizBlock(viz.probation.name, "GPU reset while loading");
+      else if (viz.name && performance.now() - (viz.lastChange || 0) < 60000) vizBlock(viz.name, "GPU reset soon after loading");
+      vizEndProbation();
+      try { localStorage.setItem("krakenVizResume", String(Date.now())); } catch {}
+      bridgeSend({ type:"log", text:"visualizer: WebGL context lost, reloading the page" });
+      setTimeout(()=>location.reload(), 500);
+    });
 
     function loadScript(src){
       return new Promise((ok, fail)=>{
@@ -2154,6 +2206,19 @@ https://example.com/door.jpg {&quot;name&quot;:&quot;Front Door&quot;, &quot;sec
       if (viz.engine) viz.engine.setRendererSize(viz.res, viz.res);
     }
 
+    // Blocklisted presets are skipped (unless every one is blocked).
+    function vizAllowed(i){ return !vizBlocked.includes(viz.keys[i]); }
+    function vizNextAllowed(from, step){
+      const n = viz.keys.length;
+      for (let k = 1; k <= n; k++){ const i = ((from + step * k) % n + n) % n; if (vizAllowed(i)) return i; }
+      return ((from + step) % n + n) % n;
+    }
+    function vizRandomAllowed(){
+      const all = viz.keys.map((_, i)=>i), ok = all.filter(vizAllowed);
+      const pool = ok.length ? ok : all;
+      return pool[Math.floor(Math.random() * pool.length)];
+    }
+
     // sel: {name} substring match, {step:+1|-1}, {random:true}, or {keep:true}
     function vizPreset(sel, blend){
       if (!viz.keys.length) return;
@@ -2165,9 +2230,9 @@ https://example.com/door.jpg {&quot;name&quot;:&quot;Front Door&quot;, &quot;sec
         if (i === -1) { viz.error = 'no preset matching "' + sel.name + '"'; return; }
         viz.index = i;
       } else if (sel.step) {
-        viz.index = ((viz.index < 0 ? 0 : viz.index) + sel.step + n) % n;
+        viz.index = vizNextAllowed(viz.index < 0 ? 0 : viz.index, sel.step);
       } else if (sel.random || viz.index < 0) {
-        viz.index = Math.floor(Math.random() * n);
+        viz.index = vizRandomAllowed();
       } else {
         return;   // keep the current preset
       }
@@ -2178,6 +2243,7 @@ https://example.com/door.jpg {&quot;name&quot;:&quot;Front Door&quot;, &quot;sec
       const time = blend ?? vizSettings.blend;
       vizResolvePreset(name).then(preset=>{
         if (token !== viz.presetToken || !viz.engine) return;   // a newer change won
+        vizProbation(name);
         viz.engine.loadPreset(preset, time);
       }).catch(e=>{ viz.error = String(e && e.message || e); reportState(); });
     }
@@ -2203,6 +2269,19 @@ https://example.com/door.jpg {&quot;name&quot;:&quot;Front Door&quot;, &quot;sec
     function vizFrame(now){
       if (!viz.on) return;
       viz.raf = requestAnimationFrame(vizFrame);
+      // Watchdog: frame gaps while a newly loaded preset is on probation.
+      const gap = viz.lastTick ? now - viz.lastTick : 0;
+      viz.lastTick = now;
+      const pr = viz.probation;
+      if (pr){
+        if (gap > VIZ_SLOW_MS && now - pr.at > 300) pr.slow++;
+        if (pr.slow >= VIZ_SLOW_LIMIT){
+          vizBlock(pr.name, "too slow to render");
+          vizEndProbation();
+          vizPreset(vizSettings.order === "sequential" ? { step: 1 } : { random: true }, 0);
+          reportState();
+        } else if (now - pr.at > VIZ_PROBATION_MS) vizEndProbation();
+      }
       // No audio for half a second (helper stopped, nothing playing): feed silence
       // rather than repeating the last waveform forever.
       if (!viz.silent && now - viz.audioAt > 500){
@@ -2251,7 +2330,7 @@ https://example.com/door.jpg {&quot;name&quot;:&quot;Front Door&quot;, &quot;sec
         viz.on = true;
         vizCanvas.classList.add("on");
         imgEl.classList.remove("show"); vidEl.classList.remove("show");
-        viz.frames = 0; viz.fpsAt = performance.now();
+        viz.frames = 0; viz.fpsAt = performance.now(); viz.lastTick = 0;
         viz.raf = requestAnimationFrame(vizFrame);
         if (nowPlaying && nowPlaying.playing) setTimeout(()=>popTitle(false), 600);   // say what's playing
       }
@@ -2262,9 +2341,17 @@ https://example.com/door.jpg {&quot;name&quot;:&quot;Front Door&quot;, &quot;sec
       if (!viz.on) return;
       viz.on = false;
       cancelAnimationFrame(viz.raf);
+      vizEndProbation();
       vizCanvas.classList.remove("on");
       paused = false;   // the command that stopped it decides what shows next
     }
+
+    // Back from a GPU-reset reload (see the watchdog): start the visualizer again.
+    try {
+      const r = Number(localStorage.getItem("krakenVizResume") || 0);
+      localStorage.removeItem("krakenVizResume");
+      if (r && Date.now() - r < 120000) setTimeout(()=>{ vizStart({ random:true }); }, 1500);
+    } catch {}
 
     /* ---- Track title pop (now playing from the bridge) ----------------
        titlesMode: "visualizer" (only over the visualizer), "always", "off".
@@ -2474,7 +2561,8 @@ OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
       return true;
     }
 
-    window.krakenDebug = { get viz(){ return viz; }, popTitle, keepAlive: now => vizTitleKeepAlive(now), cycleDue: now => vizCycleDue(now) };   // for poking at it from devtools
+    window.krakenDebug = { get viz(){ return viz; }, popTitle, keepAlive: now => vizTitleKeepAlive(now), cycleDue: now => vizCycleDue(now),
+                           frame: now => vizFrame(now), get blocked(){ return vizBlocked; } };   // for poking at it from devtools
 
     function vizLaunchTitle(spec){
       try {
@@ -2534,7 +2622,9 @@ OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
       switch (cmd.action){
         case "visualizer": {
           const m = cmd.mode || "on";
+          if (m === "toggle"){ handleRemoteCommand(Object.assign({}, cmd, { mode: viz.on ? "off" : "on" })); return; }
           if (m === "off"){ vizStop(); handleRemoteCommand({ action:"slideshow" }); return; }
+          if (m === "unblock"){ vizBlocked = []; vizLastBlocked = null; try { localStorage.removeItem("krakenVizBlock"); } catch {} break; }
           if (m === "res"){ vizSetRes(cmd.value); break; }
           if (m === "fps"){ viz.maxFps = clamp(Math.round(Number(cmd.value) || 60), 5, 60); break; }
           // Settings (saved on this page): pack, auto-change, order, blend, change on track.
@@ -2640,10 +2730,14 @@ OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
           break;
         }
         case "night":
-          nightOverride = cmd.mode === "on" ? true : cmd.mode === "off" ? false : null;
+          if (cmd.mode === "toggle"){
+            const want = !isNightModeActive();
+            nightOverride = want === isNightModeActiveForOptions(o, new Date()) ? null : want;
+          } else nightOverride = cmd.mode === "on" ? true : cmd.mode === "off" ? false : null;
           applyNightModeVisual();
           break;
         case "reload":
+          vizEndProbation();   // planned reload: don't blame the preset that's loading
           location.reload();
           return;
         case "titles":

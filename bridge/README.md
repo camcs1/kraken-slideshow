@@ -79,6 +79,7 @@ shows the Home Assistant connection. If `clients` stays 0, restart CAM.
 | `pause` / `resume` | `/pause`, `/resume` | Freeze on the current item / continue (`resume` = `slideshow`) |
 | `show <url> [seconds]` | `/show?url=…&seconds=30` | Push any image or video. With seconds, the slideshow comes back afterwards; without, it holds until `next`/`resume` |
 | `night on\|off\|auto` | `/night?mode=on` | Force night mode (uses your black/dim setting), or go back to the schedule |
+| `night toggle` | `/night?mode=toggle` | Flip what's on screen now; when that matches the schedule it goes back to following it |
 | `reload` | `/reload` | Reload the Kraken page (picks up a newly published `index.html`) |
 | `status` | `/status` | Connected clients, the last state the page reported, audio and MQTT status |
 | `playlist` / `playlist names` | `/playlist`, `/playlist?format=names` | The playlist as JSON, or one name per line |
@@ -106,6 +107,7 @@ whatever the PC is playing. Any slideshow command (`slideshow`, `next`,
 | Command | Effect |
 |---|---|
 | `visualizer on [preset words]` | Start, optionally on a preset: exact name first, else the first containing the words |
+| `visualizer toggle` | On if off, off (back to the slideshow) if on |
 | `visualizer next` / `prev` / `random` | Change preset (2.7 s blend) |
 | `visualizer res 256` | Internal render size, 128–1024 (default 192; scaled up to the LCD) |
 | `visualizer fps 20` | Frame cap, 5–60 (default none) |
@@ -114,6 +116,17 @@ whatever the PC is playing. Any slideshow command (`slideshow`, `next`,
 | `visualizer order random\|sequential` | How the automatic and on-track changes pick the next preset |
 | `visualizer blend 2.7` | Seconds to blend between presets, 0–10 |
 | `visualizer ontrack on\|off` | New preset when the track changes (the title then burns into the new one) |
+| `visualizer unblock` | Clear the watchdog's blocklist (see below) |
+
+**Preset watchdog.** CAM draws WebGL on the CPU, and a few presets are too heavy
+for it: the renderer pins every core and the screen freezes until Chromium kills
+the GPU process. Each newly loaded preset is watched for its first 10 s. Four
+frames more than 0.4 s apart, a GPU reset, or the page going away while it loads
+puts it on a blocklist (saved on the page, `krakenVizBlock`); after a GPU reset the
+page reloads and starts the visualizer again on another preset. Blocklisted
+presets are skipped by next/prev/random, auto-change and new-track changes (you can
+still pick one by name). The count is `viz_blocked` in `/status`, and each block is
+logged as `page: visualizer: blocked preset …`.
 | `visualizer fav [on\|off]` | Add or remove the preset on screen from your favourites (no argument toggles) |
 | `visualizer off` | Back to the slideshow |
 

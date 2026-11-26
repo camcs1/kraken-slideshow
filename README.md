@@ -129,9 +129,10 @@ to `http://127.0.0.1:27880/…`, or published over MQTT to `kraken/<pc name>/com
 | `hold` | Hold whatever is on screen now |
 | `slideshow` | Back to rotation, where it was before the pick |
 | `show <url> [seconds]` | Show any image or video |
-| `night on` / `off` / `auto` | Force night mode, or follow the schedule |
+| `night on` / `off` / `auto` / `toggle` | Force night mode, follow the schedule, or flip it |
 | `visualizer on [preset]` | Start the MilkDrop visualizer |
-| `visualizer next` / `prev` / `random` | Change preset |
+| `visualizer toggle` | Visualizer on/off |
+| `visualizer next` / `prev` / `random` | Change preset (presets that freeze CAM's renderer are blocklisted automatically) |
 | `visualizer res 256` / `fps 20` | Tune render size / frame cap |
 | `titles visualizer` / `always` / `off` / `show` | When the track title pops up on screen |
 | `interval 30` | Seconds each image shows (saved, same as the Configure page setting) |
