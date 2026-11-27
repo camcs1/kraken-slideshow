@@ -237,8 +237,10 @@
   <img id="imgEl" class="media contain" alt="media">
   <video id="vidEl" class="media contain" muted playsinline preload="auto"></video>
   <canvas id="vizCanvas" class="viz" width="192" height="192"></canvas>
+  <canvas id="vizGradeCanvas" class="viz" width="192" height="192"></canvas>
   <!-- Visualizer colour grade: brightness mapped onto a black > deep blue > blue >
-       violet > white ramp, then mixed with the original (k2/k3 set by vizApplyGrade). -->
+       violet > white ramp, then mixed with the original (k2/k3 set by vizApplyGrade).
+       Applied at render size: each frame is drawn through it into #vizGradeCanvas. -->
   <svg width="0" height="0" style="position:absolute" aria-hidden="true">
     <filter id="vizGrade" color-interpolation-filters="sRGB">
       <feColorMatrix in="SourceGraphic" type="matrix" result="lum"
@@ -2059,13 +2061,32 @@ https://example.com/door.jpg {&quot;name&quot;:&quot;Front Door&quot;, &quot;sec
     if (!VIZ_PACKS[vizSettings.pack]) vizSettings.pack = "default";
     function vizSaveSettings(){ try { localStorage.setItem("krakenViz", JSON.stringify(vizSettings)); } catch {} }
     // Colour grade (see the #vizGrade filter): how much of the blue/violet/white ramp
-    // replaces the preset's own colours.
+    // replaces the preset's own colours. Filtering the displayed (CSS-scaled, 640px)
+    // canvas cost ~0.5 core in CAM, so each frame is instead drawn through the filter
+    // at render size into a 2D canvas, which is shown in place of the WebGL one.
     const VIZ_GRADES = { off:0, subtle:0.4, strong:0.7, full:1 };
     if (!(vizSettings.grade in VIZ_GRADES)) vizSettings.grade = "off";
+    const vizGradeCanvas = document.getElementById("vizGradeCanvas");
+    const vizGradeCtx = vizGradeCanvas.getContext("2d", { alpha: false });
+    let vizGradeOn = false;
     function vizApplyGrade(){
       const s = VIZ_GRADES[vizSettings.grade] || 0, mix = document.getElementById("vizGradeMix");
       mix.setAttribute("k2", String(s)); mix.setAttribute("k3", String(1 - s));
-      document.getElementById("vizCanvas").style.filter = s ? "url(#vizGrade)" : "";
+      vizGradeOn = s > 0;
+      vizShowCanvas();
+    }
+    // Which canvas is on screen: the graded copy, or Butterchurn's own.
+    function vizShowCanvas(){
+      const on = !!(viz && viz.on);
+      document.getElementById("vizCanvas").classList.toggle("on", on && !vizGradeOn);
+      vizGradeCanvas.classList.toggle("on", on && vizGradeOn);
+      if (on && vizGradeOn) vizGradeDraw();
+    }
+    function vizGradeDraw(){
+      const src = document.getElementById("vizCanvas");
+      if (vizGradeCanvas.width !== src.width) vizGradeCanvas.width = vizGradeCanvas.height = src.width;
+      vizGradeCtx.filter = "url(#vizGrade)";   // reset by a resize, so set every frame
+      vizGradeCtx.drawImage(src, 0, 0);
     }
     vizApplyGrade();
 
@@ -2321,7 +2342,7 @@ https://example.com/door.jpg {&quot;name&quot;:&quot;Front Door&quot;, &quot;sec
         viz.lastDraw = now;
         vizCycleDue(now);
         if (viz.titleBurn) vizTitleKeepAlive(now);
-        try { viz.engine.render({ audioLevels: viz.levels }); }
+        try { viz.engine.render({ audioLevels: viz.levels }); if (vizGradeOn) vizGradeDraw(); }
         catch (e) { viz.error = String(e && e.message || e); }
         viz.frames++;
       }
@@ -2353,7 +2374,7 @@ https://example.com/door.jpg {&quot;name&quot;:&quot;Front Door&quot;, &quot;sec
       vizPreset(cmd.preset ? { name: cmd.preset } : cmd.random ? { random:true } : { keep:true }, first ? 0 : undefined);
       if (!viz.on){
         viz.on = true;
-        vizCanvas.classList.add("on");
+        vizShowCanvas();
         imgEl.classList.remove("show"); vidEl.classList.remove("show");
         viz.frames = 0; viz.fpsAt = performance.now(); viz.lastTick = 0;
         viz.raf = requestAnimationFrame(vizFrame);
@@ -2367,7 +2388,7 @@ https://example.com/door.jpg {&quot;name&quot;:&quot;Front Door&quot;, &quot;sec
       viz.on = false;
       cancelAnimationFrame(viz.raf);
       vizEndProbation();
-      vizCanvas.classList.remove("on");
+      vizShowCanvas();
       paused = false;   // the command that stopped it decides what shows next
     }
 
