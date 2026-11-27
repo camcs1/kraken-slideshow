@@ -1,13 +1,13 @@
-﻿# Kraken bridge: remote control for the slideshow
+# Kraken bridge: remote control for the slideshow
 
 Controls the slideshow running on the Kraken LCD from Home Assistant, the tray
 icon, PowerShell or scripts: next/previous, pick and hold an item, push any
 image or video, night mode, and a MilkDrop visualizer that follows the PC's audio.
 
 ```
-Home Assistant â—€â”€â”€MQTTâ”€â”€â–¶ kraken-bridge.js â”€â”€ws://127.0.0.1â”€â”€â–¶ Kraken page (?kraken=1, inside CAM)
-                             â–²        â–²
-       KrakenBridge.exe â”€â”€â”€â”€â”€â”˜        â””â”€â”€ UDP audio â—€â”€â”€ kraken-audio.py (only while visualizing)
+Home Assistant ◀──MQTT──▶ kraken-bridge.js ──ws://127.0.0.1──▶ Kraken page (?kraken=1, inside CAM)
+                             ▲        ▲
+       KrakenBridge.exe ─────┘        └── UDP audio ◀── kraken-audio.py (only while visualizing)
        (tray app: runs it hidden,
         restarts it, holds MQTT login)
 ```
@@ -34,7 +34,7 @@ quietly, backing off to every 30 seconds.
 exits, and shows a round status icon: green when the Kraken page and Home
 Assistant are both connected, amber if one isn't, grey if the bridge is down.
 Its menu has the current status, quick commands (Next, Hold this, Slideshow,
-Visualizer on/off, Next preset), **Home Assistant (MQTT) settingsâ€¦**, **Open
+Visualizer on/off, Next preset), **Home Assistant (MQTT) settings…**, **Open
 log**, **Restart bridge** and **Quit**.
 
 Build it (uses the C# compiler that ships with Windows, nothing to install) and
@@ -69,7 +69,7 @@ shows the Home Assistant connection. If `clients` stays 0, restart CAM.
 
 ## Commands
 
-| CLI (`node kraken-bridge.js send â€¦`) | HTTP (`http://127.0.0.1:27880/â€¦`) | Effect |
+| CLI (`node kraken-bridge.js send …`) | HTTP (`http://127.0.0.1:27880/…`) | Effect |
 |---|---|---|
 | `next` / `prev` | `/next`, `/prev` | Step through the playlist |
 | `pick Doorbell Cam` / `pick 2` | `/pick?name=Doorbell%20Cam`, `/pick?index=2` | Show one playlist item and **hold it** (videos loop) until `slideshow` |
@@ -77,7 +77,7 @@ shows the Home Assistant connection. If `clients` stays 0, restart CAM.
 | `slideshow` | `/slideshow` | **Return to the slideshow**, at the spot the rotation was at before the first pick. Also ends a `pause` or an untimed `show` |
 | `goto 3` | `/goto?index=3` | Jump to item 3 (0-based) and keep rotating from there |
 | `pause` / `resume` | `/pause`, `/resume` | Freeze on the current item / continue (`resume` = `slideshow`) |
-| `show <url> [seconds]` | `/show?url=â€¦&seconds=30` | Push any image or video. With seconds, the slideshow comes back afterwards; without, it holds until `next`/`resume` |
+| `show <url> [seconds]` | `/show?url=…&seconds=30` | Push any image or video. With seconds, the slideshow comes back afterwards; without, it holds until `next`/`resume` |
 | `night on\|off\|auto` | `/night?mode=on` | Force night mode (uses your black/dim setting), or go back to the schedule |
 | `night toggle` | `/night?mode=toggle` | Flip what's on screen now; when that matches the schedule it goes back to following it |
 | `reload` | `/reload` | Reload the Kraken page (picks up a newly published `index.html`) |
@@ -85,15 +85,15 @@ shows the Home Assistant connection. If `clients` stays 0, restart CAM.
 | `playlist` / `playlist names` | `/playlist`, `/playlist?format=names` | The playlist as JSON, or one name per line |
 
 **Item names** are the item's `name` option if it has one, otherwise the file
-name without its extension (`.../Doorbell%20Cam.jpg` â†’ `Doorbell Cam`). Set
+name without its extension (`.../Doorbell%20Cam.jpg` → `Doorbell Cam`). Set
 `{"name":"Front Door"}` in an item's JSON options to give it a friendlier name.
 `pick` matches the exact name first (ignoring case), then any name that
 *contains* the text if only one does. Ambiguous or unknown names return an error
 listing the valid names.
 
-`POST /command` with a JSON body such as `{"action":"show","url":"â€¦","seconds":20}`
+`POST /command` with a JSON body such as `{"action":"show","url":"…","seconds":20}`
 works too. Add `?wait=1` to get the page's state after the command in the reply
-(`"state":{â€¦}`, normally within a few ms, at most 2 s). The Stream Deck toggle keys
+(`"state":{…}`, normally within a few ms, at most 2 s). The Stream Deck toggle keys
 use this so their icon changes on the press, not on the next status poll.
 
 The status `"error":"Kraken page is not connected"` (HTTP 503) means the bridge
@@ -104,19 +104,19 @@ is running but CAM's page hasn't connected.
 `visualizer on` replaces the slideshow with a MilkDrop visualizer
 ([Butterchurn](https://github.com/jberg/butterchurn), with several preset packs) reacting to
 whatever the PC is playing. Any slideshow command (`slideshow`, `next`,
-`pick`â€¦) or `visualizer off` goes back.
+`pick`…) or `visualizer off` goes back.
 
 | Command | Effect |
 |---|---|
 | `visualizer on [preset words]` | Start, optionally on a preset: exact name first, else the first containing the words |
 | `visualizer toggle` | On if off, off (back to the slideshow) if on |
 | `visualizer next` / `prev` / `random` | Change preset (2.7 s blend) |
-| `visualizer res 256` | Internal render size, 128â€“1024 (default 192; scaled up to the LCD) |
-| `visualizer fps 20` | Frame cap, 5â€“60 (default none) |
+| `visualizer res 256` | Internal render size, 128–1024 (default 192; scaled up to the LCD) |
+| `visualizer fps 20` | Frame cap, 5–60 (default none) |
 | `visualizer pack <id>` | Preset pack: `default`, `extra`, `extra2`, `md1` (MilkDrop 1 classics), `minimal` (lighter on the CPU), `weekly` (community picks, 552 presets downloaded one at a time), `all` (default + extras + MD1), `favorites` |
 | `visualizer cycle 30` | Change preset automatically every N seconds (`0` = off, the default) |
 | `visualizer order random\|sequential` | How the automatic and on-track changes pick the next preset |
-| `visualizer blend 2.7` | Seconds to blend between presets, 0â€“10 |
+| `visualizer blend 2.7` | Seconds to blend between presets, 0–10 |
 | `visualizer ontrack on\|off` | New preset when the track changes (the title then burns into the new one) |
 | `visualizer grade off\|subtle\|strong\|full\|on\|toggle` | Colour grade: pulls every preset towards blue, violet and white (40 / 70 / 100 %; `on` and `toggle` bring back the last level used) |
 | `visualizer unblock` | Clear the watchdog's blocklist (see below) |
@@ -129,13 +129,13 @@ puts it on a blocklist (saved on the page, `krakenVizBlock`); after a GPU reset 
 page reloads and starts the visualizer again on another preset. Blocklisted
 presets are skipped by next/prev/random, auto-change and new-track changes (you can
 still pick one by name). The count is `viz_blocked` in `/status`, and each block is
-logged as `page: visualizer: blocked preset â€¦`.
+logged as `page: visualizer: blocked preset …`.
 | `visualizer fav [on\|off]` | Add or remove the preset on screen from your favourites (no argument toggles) |
 | `visualizer off` | Back to the slideshow |
 
 The pack, timing, order, blend, colour grade and favourites are saved on the Kraken page.
 The colour grade is an SVG filter on the finished image: each pixel's brightness
-is mapped onto a black â†’ deep blue â†’ blue â†’ violet â†’ white ramp and mixed with
+is mapped onto a black → deep blue → blue → violet → white ramp and mixed with
 the preset's own colours, so it works on every preset.
 Favourites remember which pack they came from, so the **Favourites** pack can
 mix presets from any pack, community ones included. Blending runs both presets
@@ -153,7 +153,7 @@ the preset's feedback buffer** (Butterchurn's own title renderer, patched to
 use the same font), so the preset's audio-driven warp smears and dissolves it.
 Over the slideshow it holds for a few seconds and fades. Titles also appear a
 moment after the visualizer starts. The track comes from Windows' media controls (whatever shows
-in the volume flyout: Spotify, YouTube Music, a browser tabâ€¦), read by
+in the volume flyout: Spotify, YouTube Music, a browser tab…), read by
 `kraken-nowplaying.ps1`, which the bridge runs hidden while a page is connected.
 It needs nothing installed.
 
@@ -184,7 +184,7 @@ ticks animation frames at about 40 Hz, so a frame cap only skips whole frames
 | Setting | fps | CAM CPU |
 |---|---|---|
 | Slideshow (baseline) | n/a | ~0.65 core |
-| 192 px (default) | 40 | ~1.5â€“2 cores |
+| 192 px (default) | 40 | ~1.5–2 cores |
 | 256 px | 40 | ~3.4 cores |
 | 256 px, cap 30 | 20 | ~2.3 cores |
 | 320 px | 40 | ~4 cores |
@@ -219,7 +219,7 @@ discovery. Nothing needs setting up in HA.
 | `sensor.kraken_lcd_mode` | `slideshow`, `picked`, `paused`, `remote`, `visualizer`, `disconnected` |
 | `sensor.kraken_lcd_position` | `20 / 56`, or the preset and fps in visualizer mode |
 | `sensor.kraken_lcd_showing` | Item or preset name |
-| `sensor.kraken_lcd_track` | Now playing on the PC (`Artist â€“ Title`; `playing` attribute) |
+| `sensor.kraken_lcd_track` | Now playing on the PC (`Artist – Title`; `playing` attribute) |
 | `sensor.kraken_lcd_fps` | Visualizer frame rate (diagnostic) |
 | `binary_sensor.kraken_lcd_page` | Whether the Kraken page is connected (diagnostic) |
 | `image.kraken_lcd_now` | The image on the screen |
@@ -236,7 +236,7 @@ visualizer); the item on screen is outlined, and **Back to slideshow** appears
 while one is held. GIFs stay still until hovered, except the one on screen, so
 a phone isn't playing fifty animations at once.
 
-Add it once under **Settings â†’ Dashboards â†’ â‹® â†’ Resources** as a JavaScript
+Add it once under **Settings → Dashboards → ⋮ → Resources** as a JavaScript
 module, straight from GitHub Pages:
 
 ```
@@ -308,7 +308,7 @@ It takes the full width of a sections view by default (`min_columns: 6`) and
 lays itself out in a single column on a phone.
 
 **Any command over MQTT.** Publish the command text to
-`kraken/<pc name>/command`, e.g. `next`, `pick 5`, `show https://â€¦ 20`,
+`kraken/<pc name>/command`, e.g. `next`, `pick 5`, `show https://… 20`,
 `visualizer on wormhole`. On GAMINGPC, `script.kraken_command` (field
 `command`) does this, and the dashboard's **PC** view has a **Kraken LCD**
 section built from the entities above.
