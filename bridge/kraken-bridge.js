@@ -24,7 +24,7 @@
  *                   node kraken-bridge.js send visualizer order random|sequential
  *                   node kraken-bridge.js send visualizer blend 2.7
  *                   node kraken-bridge.js send visualizer ontrack on|off
- *                   node kraken-bridge.js send visualizer grade off|subtle|strong|full|toggle   (blue/violet/white colour grade)
+ *                   node kraken-bridge.js send visualizer grade off|subtle|strong|full|on|toggle   (blue/violet/white colour grade; on/toggle = last level)
  *                   node kraken-bridge.js send visualizer fav [on|off|toggle]   (current preset)
  *                   node kraken-bridge.js send visualizer toggle|unblock
  *                   node kraken-bridge.js send night on|off|auto|toggle
@@ -463,7 +463,7 @@ function validate(cmd) {
     if (cmd.mode === "pack" && !VIZ_PACKS.includes(cmd.value)) return `visualizer pack must be one of: ${VIZ_PACKS.join(", ")}`;
     if (cmd.mode === "order" && !["random", "sequential"].includes(cmd.value)) return "visualizer order must be random or sequential";
     if (cmd.mode === "ontrack" && !["on", "off"].includes(cmd.value)) return "visualizer ontrack must be on or off";
-    if (cmd.mode === "grade" && ![...VIZ_GRADES, "toggle"].includes(cmd.value)) return `visualizer grade must be one of: ${VIZ_GRADES.join(", ")}, toggle`;
+    if (cmd.mode === "grade" && ![...VIZ_GRADES, "on", "toggle"].includes(cmd.value)) return `visualizer grade must be one of: ${VIZ_GRADES.join(", ")}, on, toggle`;
     if (cmd.mode === "fav" && !["on", "off", "toggle"].includes(cmd.value || "toggle")) return "visualizer fav must be on, off or toggle";
   }
   return null;

@@ -2692,7 +2692,11 @@ OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
           if (m === "blend"){ vizSettings.blend = clamp(Number(cmd.value) || 0, 0, 10); vizSaveSettings(); break; }
           if (m === "grade"){
             const g = String(cmd.value || "").toLowerCase();
-            vizSettings.grade = g === "toggle" ? (vizSettings.grade === "off" ? "strong" : "off") : g in VIZ_GRADES ? g : vizSettings.grade;
+            // "on" and "toggle" bring back the last level used (Strong the first time).
+            const back = vizSettings.gradeLast in VIZ_GRADES && vizSettings.gradeLast !== "off" ? vizSettings.gradeLast : "strong";
+            const want = g === "toggle" ? (vizSettings.grade === "off" ? back : "off") : g === "on" ? back : g in VIZ_GRADES ? g : vizSettings.grade;
+            if (want !== "off") vizSettings.gradeLast = want;
+            vizSettings.grade = want;
             vizSaveSettings(); vizApplyGrade(); break;
           }
           if (m === "ontrack"){ vizSettings.onTrack = cmd.value === "on" || cmd.value === true; vizSaveSettings(); break; }

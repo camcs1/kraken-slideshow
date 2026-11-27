@@ -20,7 +20,7 @@
  *   mode_entity: sensor.kraken_lcd_mode
  *   slideshow_entity: button.kraken_lcd_slideshow
  */
-const KPC_VERSION = "1.5.0";
+const KPC_VERSION = "1.6.0";
 
 const KPC_DEFAULTS = {
   title: "Pick a picture",
@@ -312,13 +312,14 @@ class KrakenScreenCard extends HTMLElement {
  *   cycle_presets: [0, 15, 30, 60, 120]
  *   visualizer_entity, preset_entity, next_entity, random_entity, title_entity, pack_entity,
  *   cycle_entity, order_entity, blend_entity, ontrack_entity, fav_entity, mode_entity,
+ *   grade_entity, grade_on_entity,
  *   track_entity, titles_entity   # see KVC_DEFAULTS
  *
  * Header: on/off, the preset on screen, favourite star, Next / Random / Title.
  * Browser: pack chooser, search, and the pack's presets (from the preset select's
  * options); tap one to load it. Only the visible rows are drawn, so a 552-name
  * pack scrolls as fast as a short one. Settings: auto-change, order, blend,
- * new preset per track, track titles.
+ * new preset per track, track titles, colour grade.
  */
 const KVC_DEFAULTS = {
   title: "Visualizer",
@@ -337,6 +338,8 @@ const KVC_DEFAULTS = {
   blend_entity: "number.kraken_lcd_viz_blend",
   ontrack_entity: "switch.kraken_lcd_viz_ontrack",
   fav_entity: "switch.kraken_lcd_viz_fav",
+  grade_entity: "select.kraken_lcd_viz_grade",
+  grade_on_entity: "switch.kraken_lcd_viz_grade_on",
   mode_entity: "sensor.kraken_lcd_mode",
   track_entity: "sensor.kraken_lcd_track",
   titles_entity: "select.kraken_lcd_titles",
@@ -510,6 +513,7 @@ class KrakenVisualizerCard extends HTMLElement {
             <div class="srow"><span class="lbl">Blend</span><div class="ctl slider"><input class="blend" type="range" aria-label="Blend seconds"><span class="blendval"></span></div></div>
             <div class="srow"><span class="lbl">New preset per track</span><div class="ctl"><button class="tgl ontrack" role="switch" aria-checked="false" aria-label="New preset per track"></button></div></div>
             <div class="srow"><span class="lbl">Track titles</span><div class="ctl"><div class="seg titles"></div></div></div>
+            <div class="srow"><span class="lbl">Colour grade<small>blue · violet · white</small></span><div class="ctl"><div class="seg grade"></div><button class="tgl gradeon" role="switch" aria-checked="false" aria-label="Colour grade"></button></div></div>
           </div>
         </div>
       </ha-card>`;
@@ -520,6 +524,7 @@ class KrakenVisualizerCard extends HTMLElement {
       locate: $(".locate"), count: $(".count"), list: $(".list"), spacer: $(".spacer"), empty: $(".empty"),
       set: $(".set"), sethead: $(".sethead"), sum: $(".sethead .sum"), chips: $(".cycle .chips"), cyclenum: $(".cyclenum"),
       order: $(".seg.order"), blend: $(".blend"), blendval: $(".blendval"), ontrack: $(".ontrack"), titles: $(".seg.titles"),
+      grade: $(".seg.grade"), gradeon: $(".gradeon"),
       acts: [...this.shadowRoot.querySelectorAll(".act")],
     };
     const e = this._el;
@@ -568,6 +573,11 @@ class KrakenVisualizerCard extends HTMLElement {
       const on = e.ontrack.getAttribute("aria-checked") === "true";
       this._call("switch", on ? "turn_off" : "turn_on", c.ontrack_entity);
     });
+    e.gradeon.addEventListener("click", () => {
+      const on = e.gradeon.getAttribute("aria-checked") === "true";
+      this._call("switch", on ? "turn_off" : "turn_on", c.grade_on_entity);
+    });
+    e.grade.addEventListener("click", ev => { const b = ev.target.closest("button"); if (b) this._call("select", "select_option", c.grade_entity, { option: b.dataset.v }); });
     const toggle = () => this._setCollapsed(!this._collapsed, true);
     e.sethead.addEventListener("click", toggle);
     e.sethead.addEventListener("keydown", ev => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); toggle(); } });
@@ -684,12 +694,20 @@ class KrakenVisualizerCard extends HTMLElement {
     const ot = S[c.ontrack_entity];
     e.ontrack.disabled = kvcBad(ot);
     e.ontrack.setAttribute("aria-checked", String(!!ot && ot.state === "on"));
+    // Colour grade: on/off switch, plus the level buttons (Off is left to the switch).
+    const gon = S[c.grade_on_entity], gr = S[c.grade_entity];
+    e.gradeon.disabled = kvcBad(gon);
+    e.gradeon.setAttribute("aria-checked", String(!!gon && gon.state === "on"));
+    const grLevels = gr && !kvcBad(gr) && Array.isArray(gr.attributes.options)
+      ? { ...gr, attributes: { ...gr.attributes, options: gr.attributes.options.filter(o => o !== "Off") } } : gr;
+    this._fillSeg(e.grade, grLevels, ["Subtle", "Strong", "Full"], {});
 
     const sum = [];
     if (cycOk && Number.isFinite(cycVal)) sum.push(cycVal > 0 ? `every ${this._secs(cycVal)}` : "auto-change off");
     if (!kvcBad(ord)) sum.push(ord.state);
     if (blOk) sum.push(`blend ${Number(bl.state)} s`);
     if (ot && ot.state === "on") sum.push("per track");
+    if (gr && !kvcBad(gr) && gr.state !== "Off") sum.push(`grade ${gr.state.toLowerCase()}`);
     e.sum.textContent = sum.join(" · ");
   }
 

@@ -139,6 +139,12 @@ module.exports = function startHaMqtt(opts) {
       state_topic: `${base}/state`,
       value_template: `{{ ${JSON.stringify(GRADE_LABELS)}.get(value_json.viz_grade, 'Off') }}`,
     })]);
+    out.push(["switch", "viz_grade_on", common("switch", "viz_grade_on", "Colour grade on", {
+      icon: "mdi:palette-swatch-variant",
+      command_topic: `${base}/viz_grade_on/set`,
+      state_topic: `${base}/state`,
+      value_template: "{{ 'OFF' if value_json.viz_grade in ['off', None] else 'ON' }}",
+    })]);
     out.push(["switch", "viz_ontrack", common("switch", "viz_ontrack", "New preset on track change", {
       icon: "mdi:music-note-plus",
       command_topic: `${base}/viz_ontrack/set`,
@@ -262,6 +268,7 @@ module.exports = function startHaMqtt(opts) {
       cmd = { action: "visualizer", mode: "pack", value: id };
     }
     else if (topic === `${base}/viz_cycle/set`) cmd = { action: "visualizer", mode: "cycle", value: Number(text) };
+    else if (topic === `${base}/viz_grade_on/set`) cmd = { action: "visualizer", mode: "grade", value: text.trim().toUpperCase() === "ON" ? "on" : "off" };
     else if (topic === `${base}/viz_grade/set`) cmd = { action: "visualizer", mode: "grade", value: text.trim().toLowerCase() };
     else if (topic === `${base}/viz_order/set`) cmd = { action: "visualizer", mode: "order", value: text.toLowerCase() };
     else if (topic === `${base}/viz_blend/set`) cmd = { action: "visualizer", mode: "blend", value: Number(text) };
@@ -366,7 +373,7 @@ module.exports = function startHaMqtt(opts) {
       subscribe([`${base}/command`, `${base}/visualizer/set`, `${base}/night/set`,
                  `${base}/preset/set`, `${base}/pick/set`, `${base}/titles/set`, `${base}/interval/set`, `${base}/interval_preset/set`,
                  `${base}/viz_pack/set`, `${base}/viz_cycle/set`, `${base}/viz_order/set`,
-                 `${base}/viz_blend/set`, `${base}/viz_ontrack/set`, `${base}/viz_fav/set`, `${base}/viz_grade/set`, `${disc}/status`]);
+                 `${base}/viz_blend/set`, `${base}/viz_ontrack/set`, `${base}/viz_fav/set`, `${base}/viz_grade/set`, `${base}/viz_grade_on/set`, `${disc}/status`]);
       publishDiscovery();
       publishState(true);
       pingTimer = setInterval(() => send(Buffer.from([0xc0, 0])), (KEEPALIVE - 5) * 1000);
