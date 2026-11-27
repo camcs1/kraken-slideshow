@@ -22,6 +22,7 @@ const net = require("net");
 const KEEPALIVE = 30;            // seconds
 const NO_PRESET = "—";           // placeholder option until presets are known
 // Visualizer preset packs (ids match the page's VIZ_PACKS) and their names in HA.
+const GRADE_LABELS = { off: "Off", subtle: "Subtle", strong: "Strong", full: "Full" };
 const PACK_LABELS = { default: "Default", extra: "Extra", extra2: "Extra 2", md1: "MilkDrop 1",
                       minimal: "Lightweight", weekly: "Community weekly", all: "All", favorites: "Favourites" };
 
@@ -130,6 +131,13 @@ module.exports = function startHaMqtt(opts) {
       command_topic: `${base}/viz_blend/set`,
       state_topic: `${base}/state`,
       value_template: stateTpl("viz_blend"),
+    })]);
+    out.push(["select", "viz_grade", common("select", "viz_grade", "Colour grade", {
+      icon: "mdi:palette-swatch-variant",
+      options: Object.values(GRADE_LABELS),
+      command_topic: `${base}/viz_grade/set`,
+      state_topic: `${base}/state`,
+      value_template: `{{ ${JSON.stringify(GRADE_LABELS)}.get(value_json.viz_grade, 'Off') }}`,
     })]);
     out.push(["switch", "viz_ontrack", common("switch", "viz_ontrack", "New preset on track change", {
       icon: "mdi:music-note-plus",
@@ -254,6 +262,7 @@ module.exports = function startHaMqtt(opts) {
       cmd = { action: "visualizer", mode: "pack", value: id };
     }
     else if (topic === `${base}/viz_cycle/set`) cmd = { action: "visualizer", mode: "cycle", value: Number(text) };
+    else if (topic === `${base}/viz_grade/set`) cmd = { action: "visualizer", mode: "grade", value: text.trim().toLowerCase() };
     else if (topic === `${base}/viz_order/set`) cmd = { action: "visualizer", mode: "order", value: text.toLowerCase() };
     else if (topic === `${base}/viz_blend/set`) cmd = { action: "visualizer", mode: "blend", value: Number(text) };
     else if (topic === `${base}/viz_fav/set`) cmd = { action: "visualizer", mode: "fav", value: text.toUpperCase() === "ON" ? "on" : "off" };
@@ -357,7 +366,7 @@ module.exports = function startHaMqtt(opts) {
       subscribe([`${base}/command`, `${base}/visualizer/set`, `${base}/night/set`,
                  `${base}/preset/set`, `${base}/pick/set`, `${base}/titles/set`, `${base}/interval/set`, `${base}/interval_preset/set`,
                  `${base}/viz_pack/set`, `${base}/viz_cycle/set`, `${base}/viz_order/set`,
-                 `${base}/viz_blend/set`, `${base}/viz_ontrack/set`, `${base}/viz_fav/set`, `${disc}/status`]);
+                 `${base}/viz_blend/set`, `${base}/viz_ontrack/set`, `${base}/viz_fav/set`, `${base}/viz_grade/set`, `${disc}/status`]);
       publishDiscovery();
       publishState(true);
       pingTimer = setInterval(() => send(Buffer.from([0xc0, 0])), (KEEPALIVE - 5) * 1000);

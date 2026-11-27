@@ -118,6 +118,7 @@ whatever the PC is playing. Any slideshow command (`slideshow`, `next`,
 | `visualizer order random\|sequential` | How the automatic and on-track changes pick the next preset |
 | `visualizer blend 2.7` | Seconds to blend between presets, 0–10 |
 | `visualizer ontrack on\|off` | New preset when the track changes (the title then burns into the new one) |
+| `visualizer grade off\|subtle\|strong\|full\|toggle` | Colour grade: pulls every preset towards blue, violet and white (40 / 70 / 100 %; `toggle` flips between off and strong) |
 | `visualizer unblock` | Clear the watchdog's blocklist (see below) |
 
 **Preset watchdog.** CAM draws WebGL on the CPU, and a few presets are too heavy
@@ -132,7 +133,10 @@ logged as `page: visualizer: blocked preset …`.
 | `visualizer fav [on\|off]` | Add or remove the preset on screen from your favourites (no argument toggles) |
 | `visualizer off` | Back to the slideshow |
 
-The pack, timing, order, blend and favourites are saved on the Kraken page.
+The pack, timing, order, blend, colour grade and favourites are saved on the Kraken page.
+The colour grade is an SVG filter on the finished image: each pixel's brightness
+is mapped onto a black → deep blue → blue → violet → white ramp and mixed with
+the preset's own colours, so it works on every preset.
 Favourites remember which pack they came from, so the **Favourites** pack can
 mix presets from any pack, community ones included. Blending runs both presets
 at once, so long blends cost CPU for that time.
@@ -208,6 +212,7 @@ discovery. Nothing needs setting up in HA.
 | `select.kraken_lcd_viz_order` | `random` or `sequential` |
 | `number.kraken_lcd_viz_blend` | Blend time between presets |
 | `switch.kraken_lcd_viz_ontrack` | New preset on track change |
+| `select.kraken_lcd_viz_grade` | Colour grade: Off / Subtle / Strong / Full |
 | `switch.kraken_lcd_viz_fav` | The preset on screen is a favourite (toggle to add/remove); attributes `favourites` (count) and `names` (every favourite's name) |
 | `text.kraken_lcd_pick` | Hold an item by number (1-based, as the Position sensor shows) or name |
 | `sensor.kraken_lcd_mode` | `slideshow`, `picked`, `paused`, `remote`, `visualizer`, `disconnected` |

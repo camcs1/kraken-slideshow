@@ -237,6 +237,21 @@
   <img id="imgEl" class="media contain" alt="media">
   <video id="vidEl" class="media contain" muted playsinline preload="auto"></video>
   <canvas id="vizCanvas" class="viz" width="192" height="192"></canvas>
+  <!-- Visualizer colour grade: brightness mapped onto a black > deep blue > blue >
+       violet > white ramp, then mixed with the original (k2/k3 set by vizApplyGrade). -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <filter id="vizGrade" color-interpolation-filters="sRGB">
+      <feColorMatrix in="SourceGraphic" type="matrix" result="lum"
+        values=".5 .6 .5 0 0  .5 .6 .5 0 0  .5 .6 .5 0 0  0 0 0 1 0"/>
+      <!-- stops at 0/.2/.4/.6/.8/1: black, #1a1590, #3346ff, #9a40ff, #d9a8ff, white -->
+      <feComponentTransfer in="lum" result="ramp">
+        <feFuncR type="table" tableValues="0 .102 .2 .604 .851 1"/>
+        <feFuncG type="table" tableValues="0 .082 .275 .251 .659 1"/>
+        <feFuncB type="table" tableValues="0 .565 1 1 1 1"/>
+      </feComponentTransfer>
+      <feComposite id="vizGradeMix" in="ramp" in2="SourceGraphic" operator="arithmetic" k1="0" k2=".7" k3=".3" k4="0"/>
+    </filter>
+  </svg>
   <div id="trackTitle" class="trackTitle" aria-live="polite"><div class="tt-title"></div><div class="tt-artist"></div></div>
   <div id="nightOverlay" class="nightOverlay" aria-hidden="true"></div>
 </div>
@@ -2004,7 +2019,7 @@ https://example.com/door.jpg {&quot;name&quot;:&quot;Front Door&quot;, &quot;sec
                             audio: vizOn && performance.now() - viz.audioAt < 1000,
                             presets: viz.keys.length, error: viz.error,
                             pack: vizSettings.pack, cycle: vizSettings.cycle, order: vizSettings.order,
-                            blend: vizSettings.blend, onTrack: vizSettings.onTrack,
+                            blend: vizSettings.blend, onTrack: vizSettings.onTrack, grade: vizSettings.grade,
                             favorite: vizIsFav(viz.name), favorites: vizFavs.length,
                             favoriteNames: vizFavs.map(f=>f.name),
                             blocked: vizBlocked.length, lastBlocked: vizLastBlocked } : null
@@ -2038,11 +2053,21 @@ https://example.com/door.jpg {&quot;name&quot;:&quot;Front Door&quot;, &quot;sec
     try { vizFavs = JSON.parse(localStorage.getItem("krakenVizFav") || "[]").filter(f=>f && f.name && f.pack); } catch {}
     const vizPresetOrigin = {};   // preset name -> concrete pack id it was loaded from
     // Visualizer settings, saved on the Kraken page (like the titles mode).
-    const VIZ_DEFAULTS = { pack:"default", cycle:0, order:"random", blend:2.7, onTrack:false };
+    const VIZ_DEFAULTS = { pack:"default", cycle:0, order:"random", blend:2.7, onTrack:false, grade:"off" };
     let vizSettings = { ...VIZ_DEFAULTS };
     try { Object.assign(vizSettings, JSON.parse(localStorage.getItem("krakenViz") || "{}")); } catch {}
     if (!VIZ_PACKS[vizSettings.pack]) vizSettings.pack = "default";
     function vizSaveSettings(){ try { localStorage.setItem("krakenViz", JSON.stringify(vizSettings)); } catch {} }
+    // Colour grade (see the #vizGrade filter): how much of the blue/violet/white ramp
+    // replaces the preset's own colours.
+    const VIZ_GRADES = { off:0, subtle:0.4, strong:0.7, full:1 };
+    if (!(vizSettings.grade in VIZ_GRADES)) vizSettings.grade = "off";
+    function vizApplyGrade(){
+      const s = VIZ_GRADES[vizSettings.grade] || 0, mix = document.getElementById("vizGradeMix");
+      mix.setAttribute("k2", String(s)); mix.setAttribute("k3", String(1 - s));
+      document.getElementById("vizCanvas").style.filter = s ? "url(#vizGrade)" : "";
+    }
+    vizApplyGrade();
 
     /* Preset watchdog. CAM renders WebGL on the CPU (SwiftShader) and some presets
        are too heavy for it: the GPU process pins every core and the page stops
@@ -2644,6 +2669,11 @@ OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
           if (m === "cycle"){ vizSettings.cycle = clamp(Math.round(Number(cmd.value) || 0), 0, 3600); viz.lastChange = performance.now(); vizSaveSettings(); break; }
           if (m === "order"){ vizSettings.order = cmd.value === "sequential" ? "sequential" : "random"; vizSaveSettings(); break; }
           if (m === "blend"){ vizSettings.blend = clamp(Number(cmd.value) || 0, 0, 10); vizSaveSettings(); break; }
+          if (m === "grade"){
+            const g = String(cmd.value || "").toLowerCase();
+            vizSettings.grade = g === "toggle" ? (vizSettings.grade === "off" ? "strong" : "off") : g in VIZ_GRADES ? g : vizSettings.grade;
+            vizSaveSettings(); vizApplyGrade(); break;
+          }
           if (m === "ontrack"){ vizSettings.onTrack = cmd.value === "on" || cmd.value === true; vizSaveSettings(); break; }
           if (m === "fav"){
             const v = String(cmd.value || "toggle");

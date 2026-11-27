@@ -24,6 +24,7 @@
  *                   node kraken-bridge.js send visualizer order random|sequential
  *                   node kraken-bridge.js send visualizer blend 2.7
  *                   node kraken-bridge.js send visualizer ontrack on|off
+ *                   node kraken-bridge.js send visualizer grade off|subtle|strong|full|toggle   (blue/violet/white colour grade)
  *                   node kraken-bridge.js send visualizer fav [on|off|toggle]   (current preset)
  *                   node kraken-bridge.js send visualizer toggle|unblock
  *                   node kraken-bridge.js send night on|off|auto|toggle
@@ -49,7 +50,8 @@ const PORT = Number(process.env.KRAKEN_BRIDGE_PORT || 27880);
 const AUDIO_PORT = Number(process.env.KRAKEN_AUDIO_PORT || 27881);       // UDP from kraken-audio.py
 const PYTHON = process.env.KRAKEN_PYTHON || "python";
 const ACTIONS = new Set(["next", "prev", "pause", "resume", "slideshow", "pick", "hold", "show", "goto", "night", "reload", "visualizer", "titles", "interval"]);
-const VIZ_MODES = ["on", "off", "toggle", "next", "prev", "random", "res", "fps", "pack", "cycle", "order", "blend", "ontrack", "fav", "unblock"];
+const VIZ_MODES = ["on", "off", "toggle", "next", "prev", "random", "res", "fps", "pack", "cycle", "order", "blend", "ontrack", "fav", "unblock", "grade"];
+const VIZ_GRADES = ["off", "subtle", "strong", "full"];
 const VIZ_PACKS = ["default", "extra", "extra2", "md1", "minimal", "weekly", "all", "favorites"];
 const TITLE_MODES = ["visualizer", "always", "off", "show"];   // when the page pops the track title
 
@@ -79,7 +81,7 @@ function cliArgsToCommand([action, ...rest]) {
       const mode = (rest[0] || "on").toLowerCase();
       const arg = rest.slice(1).join(" ").trim();
       if (mode === "res" || mode === "fps" || mode === "cycle" || mode === "blend") return { action, mode, value: Number(arg) };
-      if (mode === "pack" || mode === "order" || mode === "ontrack") return { action, mode, value: arg.toLowerCase() };
+      if (mode === "pack" || mode === "order" || mode === "ontrack" || mode === "grade") return { action, mode, value: arg.toLowerCase() };
       if (mode === "fav") return { action, mode, value: (arg || "toggle").toLowerCase() };
       return arg ? { action, mode, preset: arg } : { action, mode };
     }
@@ -305,7 +307,7 @@ function startServer() {
 
     if (cmd.action === "visualizer") {
       if (cmd.mode === "off") stopAudio();
-      else if (!["res", "fps", "pack", "cycle", "order", "blend", "ontrack", "fav", "toggle", "unblock"].includes(cmd.mode)) startAudio();   // settings don't start it; toggle follows the page's state report
+      else if (!["res", "fps", "pack", "cycle", "order", "blend", "ontrack", "fav", "toggle", "unblock", "grade"].includes(cmd.mode)) startAudio();   // settings don't start it; toggle follows the page's state report
     }
 
     broadcast(clients, cmd);
@@ -359,6 +361,7 @@ function startServer() {
       viz_order: v && v.order ? v.order : "random",
       viz_blend: v && typeof v.blend === "number" ? v.blend : 2.7,
       viz_ontrack: !!(v && v.onTrack),
+      viz_grade: v && v.grade ? v.grade : "off",
       viz_fav: !!(v && v.favorite),
       viz_blocked: v && typeof v.blocked === "number" ? v.blocked : 0,
       viz_favorites: v && typeof v.favorites === "number" ? v.favorites : 0,
@@ -460,6 +463,7 @@ function validate(cmd) {
     if (cmd.mode === "pack" && !VIZ_PACKS.includes(cmd.value)) return `visualizer pack must be one of: ${VIZ_PACKS.join(", ")}`;
     if (cmd.mode === "order" && !["random", "sequential"].includes(cmd.value)) return "visualizer order must be random or sequential";
     if (cmd.mode === "ontrack" && !["on", "off"].includes(cmd.value)) return "visualizer ontrack must be on or off";
+    if (cmd.mode === "grade" && ![...VIZ_GRADES, "toggle"].includes(cmd.value)) return `visualizer grade must be one of: ${VIZ_GRADES.join(", ")}, toggle`;
     if (cmd.mode === "fav" && !["on", "off", "toggle"].includes(cmd.value || "toggle")) return "visualizer fav must be on, off or toggle";
   }
   return null;

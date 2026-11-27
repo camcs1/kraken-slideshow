@@ -41,6 +41,8 @@ An optional local **bridge**, run by a small **tray app**, adds remote control
 - Next / previous / random preset, or start on a preset by name.
 - Preset packs (including the community's weekly picks), automatic changes on
   a timer or on each new track, blend time, and a favourites playlist.
+- Optional **colour grade** that pulls every preset towards blue, violet and
+  white (subtle, strong or full), to match blue/purple room lighting.
 - Adjustable render size and frame cap, because CAM renders WebGL on the CPU.
 - **Track titles**: on a track change the song title flies in with MilkDrop3's
   motion, then burns into the visualizer so the preset dissolves it to the music.
@@ -134,6 +136,7 @@ to `http://127.0.0.1:27880/…`, or published over MQTT to `kraken/<pc name>/com
 | `visualizer toggle` | Visualizer on/off |
 | `visualizer next` / `prev` / `random` | Change preset (presets that freeze CAM's renderer are blocklisted automatically) |
 | `visualizer res 256` / `fps 20` | Tune render size / frame cap |
+| `visualizer grade strong` | Colour grade towards blue, violet and white (`off` / `subtle` / `strong` / `full`) |
 | `titles visualizer` / `always` / `off` / `show` | When the track title pops up on screen |
 | `interval 30` | Seconds each image shows (saved, same as the Configure page setting) |
 | `reload` | Reload the Kraken page (picks up a new `index.html`) |
