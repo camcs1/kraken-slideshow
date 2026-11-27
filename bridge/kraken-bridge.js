@@ -40,6 +40,7 @@
 "use strict";
 
 const http = require("http");
+const fs = require("fs");
 const crypto = require("crypto");
 const dgram = require("dgram");
 const path = require("path");
@@ -336,10 +337,29 @@ function startServer() {
     : null;
   delete process.env.KRAKEN_MQTT_PASSWORD;
 
+  /* The visualizer's saved settings and favourites from the last page report.
+     While no page is connected (PC asleep, page reloading, bridge just started)
+     HA keeps showing these instead of defaults, so the favourites never read 0
+     just because the page is away. Saved to disk so a bridge restart keeps them. */
+  const VIZ_KEEP = ["pack", "cycle", "order", "blend", "onTrack", "grade", "favorites", "favoriteNames", "blocked"];
+  const VIZ_FILE = process.env.LOCALAPPDATA ? path.join(process.env.LOCALAPPDATA, "KrakenBridge", "visualizer-state.json") : null;
+  let lastViz = null;
+  try { if (VIZ_FILE) lastViz = JSON.parse(fs.readFileSync(VIZ_FILE, "utf8")); } catch { /* none yet */ }
+  function rememberViz(v) {
+    if (!v || typeof v !== "object") return;
+    const keep = {}; for (const k of VIZ_KEEP) if (k in v) keep[k] = v[k];
+    const json = JSON.stringify(keep);
+    if (lastViz && JSON.stringify(lastViz) === json) return;
+    lastViz = keep;
+    if (VIZ_FILE) fs.promises.mkdir(path.dirname(VIZ_FILE), { recursive: true })
+      .then(() => fs.promises.writeFile(VIZ_FILE, json)).catch(e => log(`could not save ${VIZ_FILE}: ${e.message}`));
+  }
+
   // Everything HA shows, derived from the page's latest report.
   function snapshot() {
     const { lastState: s, presets, playlist } = primary();
-    const v = s && s.visualizer;
+    const live = s && s.visualizer;
+    const v = live || lastViz;   // settings + favourites; per-frame fields below use `live`
     const vizOn = !!(s && s.mode === "visualizer");
     return {
       connected: clients.size > 0,
@@ -351,8 +371,8 @@ function startServer() {
       view: s && !vizOn ? (s.view || null) : null,   // fit/bg/zoom/rotation/offset the page drew with
       night_mode: !s ? "auto" : s.nightOverride === true ? "on" : s.nightOverride === false ? "off" : "auto",
       night: !!(s && s.night),
-      preset: v ? v.preset : null,
-      fps: vizOn ? v.fps : 0,
+      preset: live ? live.preset : null,
+      fps: vizOn ? live.fps : 0,
       presets: presets || [],
       titles: s && s.titles ? s.titles : "visualizer",
       interval: s && typeof s.interval === "number" ? s.interval : null,
@@ -362,7 +382,7 @@ function startServer() {
       viz_blend: v && typeof v.blend === "number" ? v.blend : 2.7,
       viz_ontrack: !!(v && v.onTrack),
       viz_grade: v && v.grade ? v.grade : "off",
-      viz_fav: !!(v && v.favorite),
+      viz_fav: !!(live && live.favorite),
       viz_blocked: v && typeof v.blocked === "number" ? v.blocked : 0,
       viz_favorites: v && typeof v.favorites === "number" ? v.favorites : 0,
       viz_favorite_names: v && Array.isArray(v.favoriteNames) ? v.favoriteNames.filter(n => typeof n === "string") : [],
@@ -409,6 +429,7 @@ function startServer() {
             const msg = JSON.parse(frame.payload.toString("utf8"));
             if (msg.type === "state") {
               info.state = { ...msg.state, at: new Date().toISOString() }; info.seen = Date.now();
+              rememberViz(msg.state.visualizer);
               for (const done of [...stateWaiters]) done();
               // Page left visualizer mode (a slideshow command, a reload): stop capturing.
               // The grace period covers state reports already in flight when it started.

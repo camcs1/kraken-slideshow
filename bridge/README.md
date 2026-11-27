@@ -139,7 +139,11 @@ is mapped onto a black → deep blue → blue → violet → white ramp and mixe
 the preset's own colours, so it works on every preset.
 Favourites remember which pack they came from, so the **Favourites** pack can
 mix presets from any pack, community ones included. Blending runs both presets
-at once, so long blends cost CPU for that time.
+at once, so long blends cost CPU for that time. While the page is away (PC asleep,
+page reloading) HA keeps showing the settings and favourites from its last report
+(also saved in `%LOCALAPPDATA%\KrakenBridge\visualizer-state.json`) rather than
+defaults. In the **Favourites** pack every preset on screen is a favourite, so
+`fav toggle` (the Stream Deck's Fave key) can only remove one there.
 | `presets` (CLI) / `/presets` | Preset names (loaded in the background once the page connects) |
 
 ### Track titles
